@@ -1,0 +1,123 @@
+"""Hybrid festival search: lexical/typo-tolerant scoring fused with vector similarity.
+
+score = lexical (0..1)  +  vector bonus (<= 0.4, decays with vector rank)
+
+lexical:
+  1.00        정확히 일치 (공백/기호 무시)
+  0.90-1.00   축제명에 검색어가 포함
+  0.60-0.85   검색어 토큰이 모두 포함 / 오타 허용(가장 비슷한 구간과의 철자 유사도)
+  0.40        개최장소·주소에 포함
+"""
+
+from __future__ import annotations
+
+import re
+import time
+import unicodedata
+from dataclasses import dataclass
+from difflib import SequenceMatcher
+
+from chromadb.api.models.Collection import Collection
+
+from app.models import FestivalRecord
+
+_STRIP = re.compile(r"[^0-9a-z가-힣ㄱ-ㅎㅏ-ㅣ]+")
+VECTOR_BONUS = 0.4
+FUZZY_MIN = 0.6
+_TTL = 60.0
+
+
+def normalize(text: str) -> str:
+    return _STRIP.sub("", unicodedata.normalize("NFC", text).lower())
+
+
+@dataclass
+class _Entry:
+    record: FestivalRecord
+    name_n: str
+    extra_n: str
+
+
+_cache: tuple[float, int, list[_Entry]] | None = None
+
+
+def _entries(col: Collection) -> list[_Entry]:
+    global _cache
+    now = time.monotonic()
+    if _cache and now - _cache[0] < _TTL:
+        return _cache[2]
+    res = col.get(include=["metadatas"])
+    entries = []
+    for i, m in zip(res["ids"], res["metadatas"] or []):
+        r = FestivalRecord.from_chroma(i, m)
+        entries.append(_Entry(r, normalize(r.fstvl_nm), normalize(f"{r.opar} {r.rdnmadr}")))
+    _cache = (now, len(entries), entries)
+    return entries
+
+
+def _best_window_ratio(q: str, name: str) -> float:
+    """검색어와 가장 비슷한 축제명 구간의 철자 유사도 (오타 허용)."""
+    n = len(q)
+    if n < 2 or not name:
+        return 0.0
+    if len(name) <= n + 1:
+        return SequenceMatcher(None, q, name).ratio()
+    best = 0.0
+    for size in (n - 1, n, n + 1):
+        if size < 2:
+            continue
+        for s in range(0, len(name) - size + 1):
+            sm = SequenceMatcher(None, q, name[s : s + size])
+            if sm.real_quick_ratio() <= best or sm.quick_ratio() <= best:
+                continue
+            best = max(best, sm.ratio())
+    return best
+
+
+def lexical_score(q_raw: str, q: str, e: _Entry) -> float:
+    if not q:
+        return 0.0
+    if q == e.name_n:
+        return 1.0
+    if q in e.name_n:
+        return 0.9 + 0.1 * len(q) / len(e.name_n)
+    tokens = [t for t in (normalize(t) for t in q_raw.split()) if t]
+    if len(tokens) > 1 and all(t in e.name_n for t in tokens):
+        return 0.85
+    score = 0.0
+    ratio = _best_window_ratio(q, e.name_n)
+    if ratio >= FUZZY_MIN:
+        score = 0.85 * ratio
+    if q in e.extra_n:
+        score = max(score, 0.4)
+    return score
+
+
+def hybrid_search(col: Collection, q_raw: str, limit: int = 10) -> list[FestivalRecord]:
+    q = normalize(q_raw)
+    entries = _entries(col)
+    by_id = {e.record.id: e for e in entries}
+
+    scores: dict[str, float] = {e.record.id: lexical_score(q_raw, q, e) for e in entries}
+
+    vres = col.query(query_texts=[q_raw], n_results=max(limit * 3, 30), include=["metadatas"])
+    for rank, vid in enumerate(vres["ids"][0]):
+        if vid in scores:
+            scores[vid] += VECTOR_BONUS / (1 + 0.5 * rank)
+
+    ranked = sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
+    out: list[FestivalRecord] = []
+    for rid, sc in ranked[:limit]:
+        if sc > 0:
+            out.append(by_id[rid].record)
+    return out
+
+
+def suggest_names(col: Collection, q_raw: str, limit: int = 6) -> list[str]:
+    names: list[str] = []
+    for r in hybrid_search(col, q_raw, limit=limit * 4):
+        if r.fstvl_nm not in names:
+            names.append(r.fstvl_nm)
+        if len(names) >= limit:
+            break
+    return names

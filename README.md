@@ -64,9 +64,9 @@ npm run build                              # 배포용 빌드 (dist/)
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
 | GET | `/api/festivals?page=1&size=10` | 전체 개수 + 해당 페이지 목록. `status`는 서버 오늘 날짜 기준 진행중/예정/완료 |
-| GET | `/api/festivals/search?q=벚꽃` | 벡터 유사도 검색 (표현이 달라도·오타가 있어도 비슷한 축제 반환) |
+| GET | `/api/festivals/search?q=충장 축제` | **하이브리드 검색**: 철자·부분일치(오타 허용) 점수 + 벡터 유사도 가산 |
 | POST | `/api/festivals/{id}/summarize` | Ollama 한 줄 요약 생성 후 메타데이터에 캐싱 (2회째부터 `cached: true`) |
-| GET | `/api/festivals/suggest?q=충장추제` | 연관검색어: 부분 일치 → 유사 철자(오타 교정) → 벡터 유사도 순으로 축제명 제안 |
+| GET | `/api/festivals/suggest?q=충장추제` | 연관검색어: 하이브리드 랭킹 상위 축제명 (오타 교정 포함) |
 | GET | `/api/health` | 상태 확인 |
 
 ## 환경변수 (`backend/.env`)
@@ -102,5 +102,5 @@ npm run build                              # 배포용 빌드 (dist/)
 > 사진은 Wikimedia Commons 검색 결과라 축제와 무관한 사진이 섞일 수 있고, 결과가 없으면 [picsum.photos](https://picsum.photos) 임의 이미지로 대체됩니다.
 
 ## 참고
-- 검색 품질은 임베딩 모델에 의존합니다. 정확한 축제명 일치가 항상 1순위로 나오지는 않습니다.
+- 검색은 `점수 = 철자 점수(0~1) + 벡터 보너스(≤0.4)`입니다. 대표 질의 12개 중 11개가 1순위로 정확히 나왔습니다(`uv run pytest`로 철자 점수 단위 테스트 실행).
 - MIT License

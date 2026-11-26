@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import difflib
 import logging
 import math
 import os
@@ -19,6 +18,7 @@ from app.ai_service import AIServiceError, summarize_festival
 from app.database import get_festivals_collection, init_db
 from app.logging_config import setup_logging
 from app.models import FestivalRecord
+from app.search import hybrid_search, suggest_names
 from app.schemas import FestivalOut, FestivalPage, SummaryOut
 
 setup_logging()
@@ -94,12 +94,9 @@ def search_festivals(
     limit: int = Query(10, ge=1, le=50),
     col: Collection = Depends(_collection),
 ) -> list[FestivalOut]:
-    """Semantic (vector) search over festival documents; tolerant of typos."""
+    """하이브리드 검색: 철자/부분일치(오타 허용) + 벡터 유사도."""
     q = _validate_query(q)
-    res = col.query(query_texts=[q], n_results=limit, include=["metadatas"])
-    ids = res["ids"][0]
-    metas = (res["metadatas"] or [[]])[0]
-    return [FestivalOut(**FestivalRecord.from_chroma(i, m).model_dump()) for i, m in zip(ids, metas)]
+    return [FestivalOut(**r.model_dump()) for r in hybrid_search(col, q, limit)]
 
 
 @app.get("/api/festivals/suggest", response_model=list[str])
@@ -108,27 +105,8 @@ def suggest(
     limit: int = Query(6, ge=1, le=10),
     col: Collection = Depends(_collection),
 ) -> list[str]:
-    """연관검색어: 부분 일치 → 유사 철자(오타 교정) → 벡터 유사도 순으로 축제명을 제안."""
-    q = _validate_query(q)
-    names = list({r.fstvl_nm for r in _all_records(col)})
-    out: list[str] = []
-
-    def add(items: list[str]) -> None:
-        for n in items:
-            if n not in out:
-                out.append(n)
-
-    add([n for n in names if q.lower() in n.lower()][:limit])
-    add(difflib.get_close_matches(q, names, n=limit, cutoff=0.5))
-    # 오타가 심해 철자 비교로 못 찾을 때: 2글자 단위로 쪼개 부분 일치 후보 보강
-    if len(out) < limit and len(q) >= 3:
-        grams = {q[i : i + 2] for i in range(len(q) - 1)}
-        scored = sorted(names, key=lambda n: -sum(g in n for g in grams))
-        add([n for n in scored[:limit] if any(g in n for g in grams)])
-    if len(out) < limit:
-        res = col.query(query_texts=[q], n_results=limit, include=["metadatas"])
-        add([m.get("fstvl_nm", "") for m in (res["metadatas"] or [[]])[0] if m])
-    return [n for n in out if n][:limit]
+    """연관검색어: 하이브리드 랭킹 상위 축제명 (오타 교정 포함)."""
+    return suggest_names(col, _validate_query(q), limit)
 
 
 @app.post("/api/festivals/{festival_id}/summarize", response_model=SummaryOut)
