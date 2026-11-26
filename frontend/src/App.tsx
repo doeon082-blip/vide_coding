@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { fetchFestivals, searchFestivals, suggestFestivals, summarizeFestival } from './api'
-import { Pagination } from './components'
+import { PartyPopper, Search, ShieldAlert, X } from 'lucide-react'
+import { CardSkeleton, Pagination } from './components'
 import { FestivalCard, type SummaryState } from './FestivalCard'
 import { checkInput, RequestGuard } from './security'
 import type { Festival, FestivalPage } from './types'
@@ -122,87 +123,96 @@ export default function App() {
   const items = searchResults ?? data?.items
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8">
-      <header className="mb-6">
-        <h1 className="text-2xl font-bold sm:text-3xl">🎉 전국 문화축제 정보</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          공공데이터 기반 · 로컬 AI 한 줄 요약
-          {data && ` · 총 ${data.total.toLocaleString()}건 (${data.page} / ${data.total_pages} 페이지)`}
-        </p>
-      </header>
+    <div className="min-h-screen bg-base-200">
+      <div className="navbar bg-base-100 shadow-sm">
+        <div className="mx-auto flex w-full max-w-4xl items-center gap-2 px-4">
+          <PartyPopper className="text-primary" aria-hidden />
+          <span className="text-lg font-bold">전국 문화축제</span>
+          <span className="badge badge-outline badge-sm ml-auto hidden sm:inline-flex">로컬 AI 큐레이션</span>
+        </div>
+      </div>
 
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          void runSearch(query)
-        }}
-        className="flex gap-2"
-      >
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          maxLength={100}
-          placeholder="축제 검색 (오타가 있어도 비슷한 축제를 찾아요)"
-          aria-label="축제 검색"
-          className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-500"
-        />
-        <button
-          disabled={searching}
-          className="rounded-lg bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-900 disabled:opacity-60"
+      <main className="mx-auto max-w-4xl px-4 py-8">
+        <header className="mb-6">
+          <h1 className="text-2xl font-bold sm:text-3xl">우리 동네 축제, 한눈에 🎉</h1>
+          <p className="mt-1 text-sm opacity-70">
+            공공데이터 기반 · 로컬 AI 한 줄 요약
+            {data && ` · 총 ${data.total.toLocaleString()}건 (${data.page} / ${data.total_pages} 페이지)`}
+          </p>
+        </header>
+
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            void runSearch(query)
+          }}
+          className="join w-full"
         >
-          {searching ? '검색 중…' : '검색'}
-        </button>
-        {(searchResults || query) && (
-          <button
-            type="button"
-            onClick={clearSearch}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-          >
-            초기화
+          <label className="input join-item flex flex-1 items-center gap-2">
+            <Search size={16} aria-hidden className="opacity-60" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              maxLength={100}
+              placeholder="축제 검색 (오타가 있어도 비슷한 축제를 찾아요)"
+              aria-label="축제 검색"
+              className="grow"
+            />
+            {(searchResults || query) && (
+              <button type="button" onClick={clearSearch} aria-label="검색 초기화" className="opacity-60 hover:opacity-100">
+                <X size={16} />
+              </button>
+            )}
+          </label>
+          <button disabled={searching} className="btn btn-primary join-item">
+            {searching ? <span className="loading loading-spinner loading-xs" /> : '검색'}
           </button>
+        </form>
+
+        {suggestions.length > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-1.5" aria-label="연관검색어">
+            <span className="text-xs opacity-60">연관검색어</span>
+            {suggestions.map((sg) => (
+              <button key={sg} onClick={() => pickSuggestion(sg)} className="btn btn-xs btn-soft btn-primary rounded-full">
+                {sg}
+              </button>
+            ))}
+          </div>
         )}
-      </form>
 
-      {suggestions.length > 0 && (
-        <div className="mt-2 flex flex-wrap items-center gap-1.5" aria-label="연관검색어">
-          <span className="text-xs text-slate-500">🔎 연관검색어</span>
-          {suggestions.map((s) => (
-            <button
-              key={s}
-              onClick={() => pickSuggestion(s)}
-              className="rounded-full bg-indigo-50 px-3 py-1 text-xs text-indigo-700 transition hover:bg-indigo-100"
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {searchError && (
-        <div role="alert" className="mt-4 rounded-lg bg-amber-50 p-4 text-sm font-medium text-amber-800">
-          {searchError}
-        </div>
-      )}
-      {error && (
-        <div role="alert" className="mt-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">
-          데이터를 불러오지 못했습니다: {error}
-        </div>
-      )}
-
-      <ul className={`mt-6 space-y-3 transition-opacity ${loading ? 'opacity-50' : ''}`}>
-        {items?.map((f) => (
-          <FestivalCard key={f.id} festival={f} summary={summaries[f.id]} onSummarize={onSummarize} />
-        ))}
-        {!loading && items?.length === 0 && (
-          <li className="py-12 text-center text-slate-500">표시할 축제가 없습니다.</li>
+        {searchError && (
+          <div role="alert" className="alert alert-warning alert-soft mt-4">
+            <ShieldAlert size={18} aria-hidden />
+            <span>{searchError}</span>
+          </div>
         )}
-      </ul>
+        {error && (
+          <div role="alert" className="alert alert-error alert-soft mt-4">
+            <span>데이터를 불러오지 못했습니다: {error}</span>
+          </div>
+        )}
 
-      {!searchResults && data && data.total_pages > 1 && (
-        <div className="mt-8">
-          <Pagination page={page} totalPages={data.total_pages} onChange={setPage} />
-        </div>
-      )}
+        <ul className="mt-6 space-y-3">
+          {loading && !data
+            ? Array.from({ length: 4 }, (_, i) => <CardSkeleton key={i} />)
+            : items?.map((f) => (
+                <FestivalCard key={f.id} festival={f} summary={summaries[f.id]} onSummarize={onSummarize} />
+              ))}
+          {!loading && items?.length === 0 && (
+            <li className="py-12 text-center opacity-60">표시할 축제가 없습니다.</li>
+          )}
+        </ul>
+
+        {!searchResults && data && data.total_pages > 1 && (
+          <div className="mt-8">
+            <Pagination page={page} totalPages={data.total_pages} onChange={setPage} />
+          </div>
+        )}
+      </main>
+
+      <footer className="footer footer-center p-6 text-xs opacity-60">
+        <p>공공데이터포털 전국문화축제표준데이터 · Ollama · ChromaDB · DaisyUI</p>
+      </footer>
     </div>
   )
 }

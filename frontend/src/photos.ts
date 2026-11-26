@@ -35,9 +35,15 @@ async function queryCommons(name: string, limit: number): Promise<string[]> {
     if (!res.ok) return []
     const json = await res.json()
     const pages = Object.values(json?.query?.pages ?? {}) as {
+      title?: string
       imageinfo?: { thumburl?: string; mime?: string }[]
     }[]
+    // 파일명에 축제명 핵심 단어(2자 이상)가 들어 있는 사진만 채택 → 무관한 사진 차단
+    const keywords = searchTerm(name)
+      .split(' ')
+      .filter((w) => w.length >= 2 && !/^(축제|문화제|행사|대회)$/.test(w))
     return pages
+      .filter((p) => keywords.some((k) => (p.title ?? '').includes(k)))
       .map((p) => p.imageinfo?.[0])
       .filter((i) => i && /^image\/(jpeg|png)$/.test(i.mime ?? '') && i.thumburl)
       .map((i) => i!.thumburl!)

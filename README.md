@@ -10,7 +10,7 @@
 | Backend | Python 3.12+, [uv](https://docs.astral.sh/uv/), FastAPI, httpx, python-dotenv |
 | Vector DB | ChromaDB (`backend/chroma_db`), 임베딩: Ollama `qwen3-embedding:4b` |
 | Local AI | Ollama `qwen3.5:4b` (한 줄 요약, DB에 캐싱) |
-| Frontend | React 19 + TypeScript + Vite + Tailwind CSS v4 |
+| Frontend | React 19 + TypeScript + Vite + Tailwind CSS v4 + [DaisyUI](https://daisyui.com)(무료 UI 컴포넌트/테마) + [Lucide](https://lucide.dev)(무료 아이콘) |
 | 배포 | Netlify(프론트, `netlify.toml`) + 로컬/자체 호스팅 백엔드 |
 
 ```
@@ -84,6 +84,7 @@ npm run build                              # 배포용 빌드 (dist/)
 - 의미 기반 검색 + **오타 시 관련 연관검색어 칩** 제안(클릭하면 바로 검색)
 - 카드 썸네일과 **📷 관련 사진 갤러리**(Wikimedia Commons, 없으면 임의 이미지)
 - AI 한 줄 요약(캐싱)
+- DaisyUI 테마(기본 cupcake, 다크 모드 시스템 설정이면 dracula 자동 적용), 로딩 스켈레톤, 반응형 레이아웃
 
 ## 보안
 - API 키는 `backend/.env`에서만 읽고(`.env`는 git 제외), 코드·로그에 남기지 않습니다.
@@ -99,7 +100,7 @@ npm run build                              # 배포용 빌드 (dist/)
 3. 백엔드의 `CORS_ORIGINS`에 Netlify 주소를 추가합니다.
 
 > ⚠️ AI 요약은 로컬 Ollama가 필요합니다. 백엔드(+Ollama)를 외부에 공개하지 않으면 배포된 프론트에서도 목록은 보이지 않습니다.
-> 사진은 Wikimedia Commons 검색 결과라 축제와 무관한 사진이 섞일 수 있고, 결과가 없으면 [picsum.photos](https://picsum.photos) 임의 이미지로 대체됩니다.
+> 사진은 Wikimedia Commons에서 파일명에 축제명 단어가 들어간 것만 사용하며, 없으면 [picsum.photos](https://picsum.photos) 임의 이미지로 대체됩니다.
 
 ## 참고
 - 검색은 `점수 = 철자 점수(0~1) + 벡터 보너스(≤0.4)`입니다. 대표 질의 12개 중 11개가 1순위로 정확히 나왔습니다(`uv run pytest`로 철자 점수 단위 테스트 실행).
