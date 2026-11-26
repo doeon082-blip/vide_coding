@@ -8,28 +8,28 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
-from sqlalchemy.engine import make_url
+from sqlalchemy.engine import URL, make_url
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BACKEND_DIR / ".env")
 
 
-def _resolve_database_url() -> str:
+def _resolve_database_url() -> URL:
     """Return DATABASE_URL, anchoring relative SQLite paths to backend/."""
     url = make_url(os.getenv("DATABASE_URL") or "sqlite:///./festivals.db")
     if url.drivername.startswith("sqlite") and url.database not in (None, "", ":memory:"):
         path = Path(url.database)
         if not path.is_absolute():
             url = url.set(database=str((BACKEND_DIR / path).resolve()))
-    return url.render_as_string(hide_password=False)
+    return url
 
 
 DATABASE_URL = _resolve_database_url()
 
 engine = create_engine(
     DATABASE_URL,
-    connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {},
+    connect_args={"check_same_thread": False} if DATABASE_URL.drivername.startswith("sqlite") else {},
 )
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
