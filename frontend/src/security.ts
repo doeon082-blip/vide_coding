@@ -9,12 +9,33 @@ const FORBIDDEN =
 // eslint-disable-next-line no-control-regex
 const CONTROL_CHARS = /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/
 
+// 프롬프트 인젝션 신호(서버 prompt_injection_defense.py 의 핵심 패턴과 동일한 의도). AI에게 보내는 질문에만 적용.
+const INJECTION: RegExp[] = [
+  /\b(?:ignore|disregard|forget|override|bypass)\b[^.\n]{0,40}\b(?:instruction|prompt|rule|direction|guideline|command)/i,
+  /(?:이전|위의?|앞(?:의|선)?|기존|모든|상기|지금까지(?:의)?)\s*(?:의\s*)?(?:지시|명령|지침|규칙|프롬프트|설정)[^.\n]{0,15}(?:무시|잊|취소|따르지|어기|우회)/,
+  /(?:시스템|내부|숨겨진|초기)\s*(?:프롬프트|지시|지침|설정)/,
+  /\b(?:system|hidden|initial)\s*prompt\b|\bjailbreak\b|\bdeveloper mode\b|탈옥|개발자\s*모드/i,
+  /\b(?:you are now|from now on you|act as)\b|(?:너는|넌)\s*(?:이제|지금부터)|지금부터\s*(?:너는|넌)/i,
+  /<\|?\s*(?:im_start|im_end|system|assistant)\s*\|?>|\[\/?INST\]|<<<|>>>/i,
+]
+
 export type InputCheck = { ok: true; value: string } | { ok: false; message: string }
 
 /** 공백/유니코드 정규화 후 검사. 통과하면 정제된 값을 돌려준다. */
-export function checkInput(raw: string): InputCheck {
-  const value = raw.normalize('NFC').replace(/\s+/g, ' ').trim()
-  if (value.length > MAX_LEN || CONTROL_CHARS.test(raw) || FORBIDDEN.test(value)) {
+export function checkInput(raw: string, ai = false): InputCheck {
+  // NFKC: 전각 문자 위장(＜ｓｃｒｉｐｔ＞)을 풀고, 제로폭 문자를 제거한 뒤 검사
+  const value = raw
+    .normalize('NFKC')
+    // eslint-disable-next-line no-misleading-character-class
+    .replace(/[\u200b-\u200f\u202a-\u202e\u2060-\u2064\ufeff]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (
+    value.length > MAX_LEN ||
+    CONTROL_CHARS.test(raw) ||
+    FORBIDDEN.test(value) ||
+    (ai && INJECTION.some((rx) => rx.test(value)))
+  ) {
     return { ok: false, message: VIOLATION_MESSAGE }
   }
   return { ok: true, value }

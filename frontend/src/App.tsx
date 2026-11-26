@@ -51,8 +51,8 @@ export default function App() {
   }, [page, status])
 
   /** 입력 검증(보안 프로토콜) 통과 시 정제된 값, 아니면 null + 에러 메시지 */
-  function guarded(raw: string, g = guard.current): string | null {
-    const checked = checkInput(raw)
+  function guarded(raw: string, g = guard.current, ai = false): string | null {
+    const checked = checkInput(raw, ai)
     if (!checked.ok) {
       g.reportViolation()
       setSearchError(checked.message)
@@ -130,7 +130,7 @@ export default function App() {
   async function runAsk(raw: string) {
     setSearchError(null)
     if (!raw.trim()) return
-    const q = guarded(raw, aiGuard.current)
+    const q = guarded(raw, aiGuard.current, true)
     if (q === null) return
     setAsking(true)
     try {

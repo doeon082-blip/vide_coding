@@ -6,14 +6,13 @@ import logging
 import math
 import os
 import re
-import unicodedata
 from collections.abc import AsyncIterator
 from datetime import date
 from typing import Literal
 from contextlib import asynccontextmanager
 
 from chromadb.api.models.Collection import Collection
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.ai_service import AIServiceError, answer_question, correct_query, summarize_festival
@@ -21,8 +20,9 @@ from app.database import get_festivals_collection, init_db
 from app.logging_config import setup_logging
 from app.models import FestivalRecord
 from app.photo_service import PhotoResult, get_photos
+from app.prompt_injection_defense import BLOCK_MESSAGE, InjectionBlocked, normalize_text
 from app.ratelimit import RateLimitMiddleware
-from app.search import canonical_name, hybrid_search, hybrid_search_scored, suggest_names
+from app.search import all_records, canonical_name, hybrid_search, hybrid_search_scored, invalidate_cache, suggest_names
 from app.schemas import AskIn, AskOut, CorrectionOut, FestivalOut, FestivalPage, SummaryOut, compute_status
 
 setup_logging()
@@ -50,6 +50,25 @@ app.add_middleware(RateLimitMiddleware, enabled=(os.getenv("RATE_LIMIT", "on").l
 app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=["*"], allow_headers=["*"])
 
 
+_SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+    # 이 서버는 JSON만 돌려주므로 어떤 리소스도 로드·임베드할 필요가 없다
+    "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
+    "Cross-Origin-Resource-Policy": "cross-origin",  # CORS로 허용한 프론트가 읽을 수 있어야 함
+    "Cache-Control": "no-store",
+}
+
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):  # noqa: ANN001, ANN201
+    response = await call_next(request)
+    for k, v in _SECURITY_HEADERS.items():
+        response.headers.setdefault(k, v)
+    return response
+
+
 # 스크립트/SQL 인젝션 등 허용되지 않는 입력 패턴
 _FORBIDDEN = re.compile(
     r"<\s*/?\s*(script|iframe|img|svg|object)|javascript:|on\w+\s*=|"
@@ -61,7 +80,8 @@ VIOLATION_MESSAGE = "규정위반: 허용되지 않는 입력입니다"
 
 
 def _validate_query(q: str) -> str:
-    q = unicodedata.normalize("NFC", q).strip()
+    # NFKC로 전각 문자(＜ｓｃｒｉｐｔ＞ 등) 위장을 풀고, 제로폭/제어 문자를 제거한 뒤 검사한다
+    q = normalize_text(q)
     if len(q) > 100 or _FORBIDDEN.search(q):
         logger.warning("Blocked search input (len=%d)", len(q))
         raise HTTPException(400, VIOLATION_MESSAGE)
@@ -73,8 +93,7 @@ def _collection() -> Collection:
 
 
 def _all_records(col: Collection) -> list[FestivalRecord]:
-    res = col.get(include=["metadatas"])
-    return [FestivalRecord.from_chroma(i, m) for i, m in zip(res["ids"], res["metadatas"] or [])]
+    return all_records(col)
 
 
 @app.get("/api/health")
@@ -183,6 +202,8 @@ def ai_ask(body: AskIn, col: Collection = Depends(_collection)) -> AskOut:
         )
     try:
         answer = answer_question(question, today, lines)
+    except InjectionBlocked:
+        raise HTTPException(400, BLOCK_MESSAGE) from None
     except AIServiceError as exc:
         logger.error("AI ask failed: %s", exc)
         raise HTTPException(503, str(exc)) from exc
@@ -197,6 +218,8 @@ def summarize(festival_id: str, col: Collection = Depends(_collection)) -> Summa
     record = FestivalRecord.from_chroma(res["ids"][0], (res["metadatas"] or [None])[0])
     try:
         summary, cached = summarize_festival(col, record)
+        if not cached:
+            invalidate_cache()
     except AIServiceError as exc:
         logger.error("Summarize failed id=%s: %s", festival_id[:8], exc)
         raise HTTPException(503, str(exc)) from exc

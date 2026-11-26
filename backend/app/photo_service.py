@@ -13,6 +13,7 @@ import os
 import re
 import threading
 import time
+from datetime import date
 from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any, Literal
@@ -31,10 +32,17 @@ TOUR_API_URL = (os.getenv("TOUR_API_URL") or "https://apis.data.go.kr/B551011/Ko
 IMAGE_HOSTS = {"tong.visitkorea.or.kr"}
 CACHE_FILE = Path(os.getenv("PHOTO_CACHE_FILE") or BACKEND_DIR / "cache" / "photos.json")
 CACHE_TTL = 7 * 24 * 3600
-CACHE_VERSION = 2  # v2: Photo.license 추가
+CACHE_VERSION = 3  # v3: 허용 라이선스만 저장
+# 상업적 이용이 가능한 공공누리 유형만 표시한다 (제1유형=출처표시, 제3유형=출처표시+변경금지).
+# 제2·4유형(상업적 이용 금지)이나 유형을 알 수 없는 사진은 제외한다.
+ALLOWED_LICENSES = {t.strip() for t in (os.getenv("ALLOWED_PHOTO_LICENSES") or "Type1,Type3").split(",") if t.strip()}
 MAX_PHOTOS = 6
 REGION_TYPES = {"12", "14", "15", "28"}  # 관광지, 문화시설, 행사, 레포츠 (숙박/음식점/쇼핑 제외)
 _PROVINCE_SUFFIX = ("특별시", "광역시", "특별자치시", "특별자치도", "도")
+
+# 공공데이터포털 개발계정은 하루 약 1,000건. 악용/폭주로 한도를 다 쓰지 않도록 하루 호출 예산을 둔다.
+DAILY_BUDGET = int(os.getenv("TOUR_API_DAILY_BUDGET") or 800)
+_budget: dict[str, Any] = {"date": "", "n": 0}
 
 Kind = Literal["festival", "region", "none"]
 
@@ -90,7 +98,19 @@ def _service_key() -> str:
     return unquote(raw) if "%" in raw else raw
 
 
+def _spend() -> None:
+    """TourAPI 호출 1건을 예산에서 차감. 소진되면 예외(→ 사진 없음으로 처리, 캐시하지 않음)."""
+    today = date.today().isoformat()
+    with _lock:
+        if _budget["date"] != today:
+            _budget.update(date=today, n=0)
+        if _budget["n"] >= DAILY_BUDGET:
+            raise RuntimeError("TourAPI daily budget exhausted")
+        _budget["n"] += 1
+
+
 def _call(client: httpx.Client, endpoint: str, **params: Any) -> list[dict[str, Any]]:
+    _spend()
     resp = client.get(
         f"{TOUR_API_URL}/{endpoint}",
         params={"serviceKey": _service_key(), "MobileOS": "ETC", "MobileApp": "festival", "_type": "json", **params},
@@ -136,7 +156,7 @@ def _similar(a: str, b: str) -> float:
 
 def _item_photo(item: dict[str, Any]) -> Photo | None:
     url = _safe_url(item.get("firstimage"))
-    if not url:
+    if not url or (item.get("cpyrhtDivCd") or "") not in ALLOWED_LICENSES:
         return None
     return Photo(
         url=url,
@@ -150,7 +170,7 @@ def _detail_photos(client: httpx.Client, content_id: str, title: str) -> list[Ph
     out: list[Photo] = []
     for im in _call(client, "detailImage2", contentId=content_id, imageYN="Y", numOfRows=MAX_PHOTOS, pageNo=1):
         url = _safe_url(im.get("originimgurl"))
-        if url:
+        if url and (im.get("cpyrhtDivCd") or "") in ALLOWED_LICENSES:
             out.append(
                 Photo(
                     url=url,

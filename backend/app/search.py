@@ -55,6 +55,17 @@ def _entries(col: Collection) -> list[_Entry]:
     return entries
 
 
+def invalidate_cache() -> None:
+    """메타데이터(AI 요약 등)가 바뀐 뒤 캐시를 비워 목록에 바로 반영한다."""
+    global _cache
+    _cache = None
+
+
+def all_records(col: Collection) -> list[FestivalRecord]:
+    """전체 레코드(60초 캐시). 목록 요청마다 Chroma 전체를 읽지 않게 해 DoS 증폭을 줄인다."""
+    return [e.record for e in _entries(col)]
+
+
 def _best_window_ratio(q: str, name: str) -> float:
     """검색어와 가장 비슷한 축제명 구간의 철자 유사도 (오타 허용)."""
     n = len(q)
