@@ -1,0 +1,11 @@
+# Netlify (무료 플랜) — 프론트엔드 정적 배포
+# 사이트 환경변수 VITE_API_BASE_URL 에 배포된 백엔드 주소를 지정하세요.
+[build]
+  base = "frontend"
+  command = "npm run build"
+  publish = "dist"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

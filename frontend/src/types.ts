@@ -1,14 +1,14 @@
 export type FestivalStatus = '진행중' | '예정' | '완료'
 
 export interface Festival {
-  id: number
+  id: string
   fstvl_nm: string
   fstvl_start_date: string
   fstvl_end_date: string
   opar: string
   fstvl_co: string
   rdnmadr: string
-  ai_summary: string | null
+  ai_summary: string
   status: FestivalStatus | null
 }
 
@@ -21,7 +21,7 @@ export interface FestivalPage {
 }
 
 export interface SummaryResult {
-  id: number
+  id: string
   ai_summary: string
   cached: boolean
 }
