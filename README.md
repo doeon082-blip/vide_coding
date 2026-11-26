@@ -28,7 +28,8 @@
 ├── frontend/src/
 │   ├── App.tsx            # 목록·검색·연관검색어·페이지네이션
 │   ├── FestivalCard.tsx   # 카드(썸네일, 관련 사진 갤러리, AI 요약)
-│   ├── photos.ts          # Wikimedia Commons 사진 조회(무료) + picsum 대체
+│   ├── photos.ts          # Wikimedia Commons 사진 조회(무료, 파일명 일치만)
+│   ├── theme.ts           # 축제명 → 테마 색 타일/이모지, 이미지 검색 링크
 │   └── security.ts        # 입력 검증·속도 제한·이미지 URL 화이트리스트
 ├── .github/workflows/deploy-pages.yml   # Pages 자동 배포
 ├── netlify.toml
@@ -83,7 +84,7 @@ npm run build                              # 배포용 빌드 (dist/)
 ## 주요 기능
 - 10개 단위 페이지네이션, 진행중/예정/완료 배지
 - 의미 기반 검색 + **오타 시 관련 연관검색어 칩** 제안(클릭하면 바로 검색)
-- 카드 썸네일과 **📷 관련 사진 갤러리**(Wikimedia Commons, 없으면 임의 이미지)
+- 카드 커버(실제 사진 또는 축제명 기반 테마 타일), 축제 소개문, **사진 찾기 갤러리**(Wikimedia Commons)
 - AI 한 줄 요약(캐싱)
 - DaisyUI 테마(기본 cupcake, 다크 모드 시스템 설정이면 dracula 자동 적용), 로딩 스켈레톤, 반응형 레이아웃
 
@@ -92,7 +93,7 @@ npm run build                              # 배포용 빌드 (dist/)
 - 검색 입력에서 `<script>`, SQL 인젝션(`' OR 1=1 --`, `DROP TABLE` 등), 제어문자, 100자 초과를 차단하고
   `규정위반: 허용되지 않는 입력입니다`(HTTP 400)를 반환합니다.
 - 프론트(`security.ts`)에서도 같은 규칙으로 먼저 검증하고, 8회/10초 초과 요청은 제한하며, 위반 3회 누적 시 30초간 검색을 차단합니다.
-- 이미지는 `https` + 허용 호스트(Wikimedia, picsum)만 렌더링합니다.
+- 이미지는 `https` + 허용 호스트(Wikimedia)만 렌더링합니다.
 - CORS는 `CORS_ORIGINS`에 지정한 출처만 허용합니다.
 
 ## 배포 (전부 무료)
@@ -114,7 +115,7 @@ npm run build                              # 배포용 빌드 (dist/)
 서버는 클라이언트(IP)별 요청 제한이 있습니다: AI 요약 10회/분, 검색 40회/분, 연관검색어 90회/분, 그 외 120회/분 (`RATE_LIMIT=off`로 끌 수 있음).
 
 > ⚠️ PC와 터널이 꺼져 있으면 배포된 화면에서 목록이 보이지 않습니다. AI 요약은 로컬 Ollama가 필요합니다.
-> 사진은 Wikimedia Commons에서 파일명에 축제명 단어가 들어간 것만 사용하며, 없으면 [picsum.photos](https://picsum.photos) 임의 이미지로 대체됩니다.
+> 사진은 Wikimedia Commons에서 파일명에 축제명 단어가 들어간 것만 사용합니다. 없으면 임의 사진 대신 축제 테마 색 타일(🌸🎆🎵🍜…)과 이미지 검색 링크를 보여줍니다.
 
 ## 참고
 - 검색은 `점수 = 철자 점수(0~1) + 벡터 보너스(≤0.4)`입니다. 대표 질의 12개 중 11개가 1순위로 정확히 나왔습니다(`uv run pytest`로 철자 점수 단위 테스트 실행).

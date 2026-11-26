@@ -57,7 +57,7 @@ export class RequestGuard {
   }
 }
 
-const IMAGE_HOSTS = new Set(['upload.wikimedia.org', 'picsum.photos', 'fastly.picsum.photos'])
+const IMAGE_HOSTS = new Set(['upload.wikimedia.org'])
 
 /** https + 허용된 호스트의 이미지만 렌더링 */
 export function isSafeImageUrl(url: string): boolean {
