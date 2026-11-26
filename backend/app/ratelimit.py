@@ -37,6 +37,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
     def _rule(self, request: Request) -> tuple[str, int, int]:
         path = request.url.path
+        if path.endswith("/photos"):  # 목록 한 페이지가 10건을 한꺼번에 요청
+            return "photos", 240, 60
         for prefix, method, limit, window in RULES:
             if path.startswith(prefix) and (method is None or request.method == method):
                 return f"{prefix}|{method}", limit, window

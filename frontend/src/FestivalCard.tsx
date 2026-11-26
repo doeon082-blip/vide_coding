@@ -3,12 +3,13 @@ import { useState } from 'react'
 import { StatusBadge } from './components'
 import { usePhotos } from './photos'
 import { festivalTheme, imageSearchUrl } from './theme'
-import type { Festival } from './types'
+import type { Festival, PhotoResult } from './types'
 
 export type SummaryState = { loading?: boolean; text?: string; error?: string }
 
 /** 실제 사진이 있으면 사진, 없으면 축제 테마 색 타일(이모지) */
-function Cover({ festival: f, photo }: { festival: Festival; photo?: string }) {
+function Cover({ festival: f, photos }: { festival: Festival; photos: PhotoResult | null }) {
+  const photo = photos?.photos[0]?.thumb
   const t = festivalTheme(f.fstvl_nm)
   return (
     <figure
@@ -22,6 +23,8 @@ function Cover({ festival: f, photo }: { festival: Festival; photo?: string }) {
           referrerPolicy="no-referrer"
           className="absolute inset-0 h-full w-full object-cover"
         />
+      ) : photos === null ? (
+        <div className="skeleton h-full w-full rounded-none" />
       ) : (
         <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-white">
           <span className="text-4xl drop-shadow" aria-hidden>
@@ -29,6 +32,9 @@ function Cover({ festival: f, photo }: { festival: Festival; photo?: string }) {
           </span>
           <span className="text-xs font-semibold tracking-wide opacity-90">{t.label}</span>
         </div>
+      )}
+      {photo && photos?.kind === 'region' && (
+        <span className="badge badge-neutral badge-sm absolute bottom-1 left-1 opacity-90">{photos.region} 지역</span>
       )}
     </figure>
   )
@@ -44,15 +50,14 @@ export function FestivalCard({
   onSummarize: (f: Festival) => void
 }) {
   const [showGallery, setShowGallery] = useState(false)
-  const thumb = usePhotos(f.fstvl_nm, 1)
-  const gallery = usePhotos(f.fstvl_nm, 6, showGallery)
+  const photos = usePhotos(f.id)
   const summary = f.ai_summary || s?.text
 
   return (
     <li className="card card-border bg-base-100 shadow-sm transition hover:shadow-md">
       <div className="card-body gap-4 p-4 sm:p-5">
         <div className="flex flex-col gap-4 sm:flex-row">
-          <Cover festival={f} photo={thumb?.[0]} />
+          <Cover festival={f} photos={photos} />
 
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-3">
@@ -115,32 +120,42 @@ export function FestivalCard({
 
         {showGallery && (
           <div>
-            {gallery === null ? (
+            {photos === null ? (
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {Array.from({ length: 3 }, (_, i) => (
                   <div key={i} className="skeleton aspect-[4/3] w-full" />
                 ))}
               </div>
-            ) : gallery.length > 0 ? (
+            ) : photos.photos.length > 0 ? (
               <>
+                <p className="mb-2 text-sm font-medium">
+                  {photos.kind === 'festival'
+                    ? `📷 ${photos.matched_title || f.fstvl_nm} 사진`
+                    : `📍 ${photos.region} 지역 관광 사진 (이 축제의 사진은 아니에요)`}
+                </p>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                  {gallery.map((u) => (
-                    <a key={u} href={u} target="_blank" rel="noopener noreferrer">
+                  {photos.photos.map((p) => (
+                    <a key={p.url} href={p.url} target="_blank" rel="noopener noreferrer" className="group relative">
                       <img
-                        src={u}
-                        alt={`${f.fstvl_nm} 관련 사진`}
+                        src={p.thumb}
+                        alt={p.caption || `${f.fstvl_nm} 관련 사진`}
                         loading="lazy"
                         referrerPolicy="no-referrer"
-                        className="aspect-[4/3] w-full rounded-box bg-base-200 object-cover transition hover:opacity-90"
+                        className="aspect-[4/3] w-full rounded-box bg-base-200 object-cover transition group-hover:opacity-90"
                       />
+                      {photos.kind === 'region' && p.caption && (
+                        <span className="absolute inset-x-0 bottom-0 truncate rounded-b-box bg-black/50 px-2 py-0.5 text-xs text-white">
+                          {p.caption}
+                        </span>
+                      )}
                     </a>
                   ))}
                 </div>
-                <p className="mt-1 text-xs opacity-50">출처: Wikimedia Commons (파일명이 축제명과 일치하는 사진만 표시)</p>
+                <p className="mt-1 text-xs opacity-50">출처: 한국관광공사 (TourAPI)</p>
               </>
             ) : (
               <div className="rounded-box bg-base-200 p-4 text-sm">
-                <p>무료 사진 저장소(Wikimedia)에는 이 축제의 사진이 없어요. 관련 없는 사진은 보여드리지 않습니다.</p>
+                <p>한국관광공사에 등록된 사진을 찾지 못했어요.</p>
                 <a
                   href={imageSearchUrl(f.fstvl_nm)}
                   target="_blank"

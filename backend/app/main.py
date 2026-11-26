@@ -18,6 +18,7 @@ from app.ai_service import AIServiceError, summarize_festival
 from app.database import get_festivals_collection, init_db
 from app.logging_config import setup_logging
 from app.models import FestivalRecord
+from app.photo_service import PhotoResult, get_photos
 from app.ratelimit import RateLimitMiddleware
 from app.search import hybrid_search, suggest_names
 from app.schemas import FestivalOut, FestivalPage, SummaryOut
@@ -109,6 +110,16 @@ def suggest(
 ) -> list[str]:
     """연관검색어: 하이브리드 랭킹 상위 축제명 (오타 교정 포함)."""
     return suggest_names(col, _validate_query(q), limit)
+
+
+@app.get("/api/festivals/{festival_id}/photos", response_model=PhotoResult)
+def photos(festival_id: str, col: Collection = Depends(_collection)) -> PhotoResult:
+    """한국관광공사 TourAPI 기반 축제/지역 사진 (디스크 캐싱)."""
+    res = col.get(ids=[festival_id], include=["metadatas"])
+    if not res["ids"]:
+        raise HTTPException(404, "축제를 찾을 수 없습니다.")
+    record = FestivalRecord.from_chroma(res["ids"][0], (res["metadatas"] or [None])[0])
+    return get_photos(record)
 
 
 @app.post("/api/festivals/{festival_id}/summarize", response_model=SummaryOut)

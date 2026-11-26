@@ -25,3 +25,16 @@ export interface SummaryResult {
   ai_summary: string
   cached: boolean
 }
+
+export interface Photo {
+  url: string
+  thumb: string
+  caption: string
+}
+
+export interface PhotoResult {
+  kind: 'festival' | 'region' | 'none'
+  photos: Photo[]
+  region: string
+  matched_title: string
+}

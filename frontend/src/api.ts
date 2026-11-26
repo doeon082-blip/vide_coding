@@ -1,4 +1,4 @@
-import type { Festival, FestivalPage, SummaryResult } from './types'
+import type { Festival, FestivalPage, PhotoResult, SummaryResult } from './types'
 
 const ENV_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
 
@@ -39,3 +39,6 @@ export const suggestFestivals = (q: string, limit = 6) =>
 
 export const summarizeFestival = (id: string) =>
   request<SummaryResult>(`/api/festivals/${id}/summarize`, { method: 'POST' })
+
+/** 한국관광공사 TourAPI 기반 축제/지역 사진 */
+export const fetchPhotos = (id: string) => request<PhotoResult>(`/api/festivals/${id}/photos`)

@@ -36,3 +36,6 @@ dist-ssr/
 .idea/
 .DS_Store
 Thumbs.db
+
+# 사진 캐시
+cache/

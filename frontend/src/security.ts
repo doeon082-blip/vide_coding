@@ -57,7 +57,7 @@ export class RequestGuard {
   }
 }
 
-const IMAGE_HOSTS = new Set(['upload.wikimedia.org'])
+const IMAGE_HOSTS = new Set(['tong.visitkorea.or.kr'])
 
 /** https + 허용된 호스트의 이미지만 렌더링 */
 export function isSafeImageUrl(url: string): boolean {
