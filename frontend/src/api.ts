@@ -1,9 +1,19 @@
 import type { Festival, FestivalPage, SummaryResult } from './types'
 
-const BASE = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000').replace(/\/$/, '')
+const ENV_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
+
+/** 배포본은 public/config.json 의 apiBaseUrl 을 우선 사용 (터널 주소가 바뀌어도 재빌드 불필요) */
+let basePromise: Promise<string> | null = null
+function getBase(): Promise<string> {
+  basePromise ??= fetch(`${import.meta.env.BASE_URL}config.json`, { cache: 'no-store' })
+    .then((r) => (r.ok ? r.json() : {}))
+    .then((c: { apiBaseUrl?: string }) => (c.apiBaseUrl || ENV_BASE).replace(/\/$/, ''))
+    .catch(() => ENV_BASE.replace(/\/$/, ''))
+  return basePromise
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, init)
+  const res = await fetch(`${await getBase()}${path}`, init)
   if (!res.ok) {
     let detail = `${res.status} ${res.statusText}`
     try {

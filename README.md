@@ -11,7 +11,7 @@
 | Vector DB | ChromaDB (`backend/chroma_db`), 임베딩: Ollama `qwen3-embedding:4b` |
 | Local AI | Ollama `qwen3.5:4b` (한 줄 요약, DB에 캐싱) |
 | Frontend | React 19 + TypeScript + Vite + Tailwind CSS v4 + [DaisyUI](https://daisyui.com)(무료 UI 컴포넌트/테마) + [Lucide](https://lucide.dev)(무료 아이콘) |
-| 배포 | Netlify(프론트, `netlify.toml`) + 로컬/자체 호스팅 백엔드 |
+| 배포 | GitHub Pages(프론트) + 로컬 백엔드/Ollama + Cloudflare Quick Tunnel (대안: Netlify, `netlify.toml`) |
 
 ```
 .
@@ -30,6 +30,7 @@
 │   ├── FestivalCard.tsx   # 카드(썸네일, 관련 사진 갤러리, AI 요약)
 │   ├── photos.ts          # Wikimedia Commons 사진 조회(무료) + picsum 대체
 │   └── security.ts        # 입력 검증·속도 제한·이미지 URL 화이트리스트
+├── .github/workflows/deploy-pages.yml   # Pages 자동 배포
 ├── netlify.toml
 └── README.md
 ```
@@ -94,12 +95,25 @@ npm run build                              # 배포용 빌드 (dist/)
 - 이미지는 `https` + 허용 호스트(Wikimedia, picsum)만 렌더링합니다.
 - CORS는 `CORS_ORIGINS`에 지정한 출처만 허용합니다.
 
-## 배포 (Netlify, 무료)
-1. 저장소를 Netlify에 연결하면 `netlify.toml`이 빌드(`frontend`, `npm run build`, `dist`)를 설정합니다.
-2. Netlify 사이트 환경변수 `VITE_API_BASE_URL`에 백엔드 공개 주소를 지정합니다.
-3. 백엔드의 `CORS_ORIGINS`에 Netlify 주소를 추가합니다.
+## 배포 (전부 무료)
+구성: **프론트 = GitHub Pages**, **백엔드 + Ollama = 내 PC**, 둘을 **Cloudflare Quick Tunnel**로 연결합니다.
+(Ollama 모델을 돌릴 수 있는 무료 클라우드가 없어 백엔드는 PC에 둡니다.)
 
-> ⚠️ AI 요약은 로컬 Ollama가 필요합니다. 백엔드(+Ollama)를 외부에 공개하지 않으면 배포된 프론트에서도 목록은 보이지 않습니다.
+1. **프론트 (자동)**: `main`에 `frontend/**` 변경을 푸시하면 `.github/workflows/deploy-pages.yml`이 빌드·배포합니다.
+   - 저장소 Settings → Pages → **Source: GitHub Actions** 로 한 번만 설정 (무료 플랜은 저장소가 public이어야 함)
+   - 주소: `https://<계정>.github.io/<저장소명>/`
+2. **백엔드 + 터널 (PC에서 실행)**
+   ```bash
+   cd backend && uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
+   cloudflared tunnel --url http://127.0.0.1:8000     # 출력되는 https://xxxx.trycloudflare.com 주소 확인
+   ```
+   - `cloudflared`: `winget install Cloudflare.cloudflared`
+   - 백엔드 `CORS_ORIGINS`에 Pages 주소(`https://<계정>.github.io`)를 포함
+3. **주소 연결**: 터널 주소는 실행할 때마다 바뀌므로 `frontend/public/config.json`의 `apiBaseUrl`을 새 주소로 바꿔 푸시하면 재배포됩니다. (재빌드 시 코드 수정 불필요)
+
+서버는 클라이언트(IP)별 요청 제한이 있습니다: AI 요약 10회/분, 검색 40회/분, 연관검색어 90회/분, 그 외 120회/분 (`RATE_LIMIT=off`로 끌 수 있음).
+
+> ⚠️ PC와 터널이 꺼져 있으면 배포된 화면에서 목록이 보이지 않습니다. AI 요약은 로컬 Ollama가 필요합니다.
 > 사진은 Wikimedia Commons에서 파일명에 축제명 단어가 들어간 것만 사용하며, 없으면 [picsum.photos](https://picsum.photos) 임의 이미지로 대체됩니다.
 
 ## 참고

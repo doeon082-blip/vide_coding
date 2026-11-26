@@ -18,6 +18,7 @@ from app.ai_service import AIServiceError, summarize_festival
 from app.database import get_festivals_collection, init_db
 from app.logging_config import setup_logging
 from app.models import FestivalRecord
+from app.ratelimit import RateLimitMiddleware
 from app.search import hybrid_search, suggest_names
 from app.schemas import FestivalOut, FestivalPage, SummaryOut
 
@@ -35,6 +36,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(title="Festival API", lifespan=lifespan)
 
 origins = [o.strip() for o in (os.getenv("CORS_ORIGINS") or "http://localhost:5173").split(",") if o.strip()]
+app.add_middleware(RateLimitMiddleware, enabled=(os.getenv("RATE_LIMIT", "on").lower() != "off"))
 app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=["*"], allow_headers=["*"])
 
 
