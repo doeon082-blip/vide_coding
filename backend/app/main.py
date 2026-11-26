@@ -8,20 +8,22 @@ import os
 import re
 import unicodedata
 from collections.abc import AsyncIterator
+from datetime import date
+from typing import Literal
 from contextlib import asynccontextmanager
 
 from chromadb.api.models.Collection import Collection
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.ai_service import AIServiceError, summarize_festival
+from app.ai_service import AIServiceError, answer_question, correct_query, summarize_festival
 from app.database import get_festivals_collection, init_db
 from app.logging_config import setup_logging
 from app.models import FestivalRecord
 from app.photo_service import PhotoResult, get_photos
 from app.ratelimit import RateLimitMiddleware
-from app.search import hybrid_search, suggest_names
-from app.schemas import FestivalOut, FestivalPage, SummaryOut
+from app.search import canonical_name, hybrid_search, hybrid_search_scored, suggest_names
+from app.schemas import AskIn, AskOut, CorrectionOut, FestivalOut, FestivalPage, SummaryOut, compute_status
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -73,13 +75,28 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+def _sort_by_status(records: list[FestivalRecord]) -> dict[str, list[FestivalRecord]]:
+    """진행중(곧 끝나는 순) / 예정(곧 시작하는 순) / 완료(최근 종료 순)로 분류·정렬."""
+    groups: dict[str, list[FestivalRecord]] = {"진행중": [], "예정": [], "완료": [], "미정": []}
+    for r in records:
+        groups[compute_status(r.fstvl_start_date, r.fstvl_end_date) or "미정"].append(r)
+    groups["진행중"].sort(key=lambda r: (r.fstvl_end_date or r.fstvl_start_date, r.id))
+    groups["예정"].sort(key=lambda r: (r.fstvl_start_date, r.id))
+    groups["완료"].sort(key=lambda r: (r.fstvl_end_date or r.fstvl_start_date, r.id), reverse=True)
+    return groups
+
+
 @app.get("/api/festivals", response_model=FestivalPage)
 def list_festivals(
     page: int = Query(1, ge=1),
     size: int = Query(10, ge=1, le=100),
+    status: Literal["진행중", "예정", "완료"] | None = Query(None, description="상태 필터 (없으면 전체)"),
     col: Collection = Depends(_collection),
 ) -> FestivalPage:
-    records = sorted(_all_records(col), key=lambda r: (r.fstvl_start_date, r.id), reverse=True)
+    groups = _sort_by_status(_all_records(col))
+    counts = {k: len(v) for k, v in groups.items() if k != "미정"}
+    counts["전체"] = sum(len(v) for v in groups.values())
+    records = groups[status] if status else groups["진행중"] + groups["예정"] + groups["완료"] + groups["미정"]
     total = len(records)
     chunk = records[(page - 1) * size : page * size]
     return FestivalPage(
@@ -87,6 +104,7 @@ def list_festivals(
         page=page,
         size=size,
         total_pages=max(1, math.ceil(total / size)),
+        counts=counts,
         items=[FestivalOut(**r.model_dump()) for r in chunk],
     )
 
@@ -120,6 +138,48 @@ def photos(festival_id: str, col: Collection = Depends(_collection)) -> PhotoRes
         raise HTTPException(404, "축제를 찾을 수 없습니다.")
     record = FestivalRecord.from_chroma(res["ids"][0], (res["metadatas"] or [None])[0])
     return get_photos(record)
+
+
+@app.get("/api/ai/correct", response_model=CorrectionOut)
+def ai_correct(q: str = Query(..., min_length=1), col: Collection = Depends(_collection)) -> CorrectionOut:
+    """로컬 AI 오타 교정: '혹시 ○○을(를) 찾으셨나요?'. 이미 정확히 일치하면 AI를 호출하지 않는다."""
+    q = _validate_query(q)
+    hits = hybrid_search_scored(col, q, limit=20)
+    if not hits or hits[0].lexical >= 0.9:
+        return CorrectionOut()
+    candidates: list[str] = []
+    for h in hits:
+        name = canonical_name(h.record.fstvl_nm)
+        if name not in candidates:
+            candidates.append(name)
+    try:
+        return CorrectionOut(corrected=correct_query(q, candidates[:12]))
+    except AIServiceError as exc:
+        logger.error("AI correct failed: %s", exc)
+        return CorrectionOut()
+
+
+@app.post("/api/ai/ask", response_model=AskOut)
+def ai_ask(body: AskIn, col: Collection = Depends(_collection)) -> AskOut:
+    """로컬 AI 큐레이터(RAG): 자연어 질문 → 관련 축제 검색 → 검색 결과만 근거로 추천."""
+    question = _validate_query(body.question)
+    hits = hybrid_search_scored(col, question, limit=8)
+    if not hits:
+        return AskOut(answer="관련된 축제를 찾지 못했어요. 다른 표현으로 질문해 주세요.", festivals=[])
+    today = date.today().isoformat()
+    lines = []
+    for h in hits:
+        r = h.record
+        status = compute_status(r.fstvl_start_date, r.fstvl_end_date) or "일정미정"
+        lines.append(
+            f"[{status}] {r.fstvl_nm} | {r.fstvl_start_date}~{r.fstvl_end_date} | {r.opar or r.rdnmadr} | {r.fstvl_co[:120]}"
+        )
+    try:
+        answer = answer_question(question, today, lines)
+    except AIServiceError as exc:
+        logger.error("AI ask failed: %s", exc)
+        raise HTTPException(503, str(exc)) from exc
+    return AskOut(answer=answer, festivals=[FestivalOut(**h.record.model_dump()) for h in hits[:5]])
 
 
 @app.post("/api/festivals/{festival_id}/summarize", response_model=SummaryOut)

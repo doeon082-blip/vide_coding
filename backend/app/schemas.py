@@ -45,6 +45,7 @@ class FestivalPage(BaseModel):
     page: int
     size: int
     total_pages: int
+    counts: dict[str, int] = {}
     items: list[FestivalOut]
 
 
@@ -52,3 +53,16 @@ class SummaryOut(BaseModel):
     id: str
     ai_summary: str
     cached: bool
+
+
+class CorrectionOut(BaseModel):
+    corrected: str | None = None
+
+
+class AskIn(BaseModel):
+    question: str
+
+
+class AskOut(BaseModel):
+    answer: str
+    festivals: list[FestivalOut]

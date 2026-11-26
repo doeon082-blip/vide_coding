@@ -1,33 +1,46 @@
+import { Bot, PartyPopper, Search, ShieldAlert, Sparkles, Wand2, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { fetchFestivals, searchFestivals, suggestFestivals, summarizeFestival } from './api'
-import { PartyPopper, Search, ShieldAlert, X } from 'lucide-react'
+import { askCurator, correctQuery, fetchFestivals, searchFestivals, suggestFestivals, summarizeFestival } from './api'
 import { CardSkeleton, Pagination } from './components'
 import { FestivalCard, type SummaryState } from './FestivalCard'
 import { checkInput, RequestGuard } from './security'
-import type { Festival, FestivalPage } from './types'
+import type { Festival, FestivalPage, StatusFilter } from './types'
 
 const PAGE_SIZE = 10
+const TABS: StatusFilter[] = ['전체', '진행중', '예정', '완료']
+const EXAMPLES = ['아이랑 가기 좋은 겨울 축제', '지금 열리고 있는 축제 추천해줘', '먹거리가 좋은 축제는?']
+
+type Mode = { kind: 'list' } | { kind: 'search'; query: string } | { kind: 'ai'; question: string; answer: string }
 
 export default function App() {
   const [page, setPage] = useState(1)
+  const [status, setStatus] = useState<StatusFilter>('전체')
   const [data, setData] = useState<FestivalPage | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   const [query, setQuery] = useState('')
-  const [searchResults, setSearchResults] = useState<Festival[] | null>(null)
+  const [mode, setMode] = useState<Mode>({ kind: 'list' })
+  const [results, setResults] = useState<Festival[] | null>(null)
   const [searchError, setSearchError] = useState<string | null>(null)
   const [searching, setSearching] = useState(false)
   const [suggestions, setSuggestions] = useState<string[]>([])
+  const [didYouMean, setDidYouMean] = useState<string | null>(null)
+
+  const [aiOpen, setAiOpen] = useState(false)
+  const [question, setQuestion] = useState('')
+  const [asking, setAsking] = useState(false)
+
   const [summaries, setSummaries] = useState<Record<string, SummaryState>>({})
   const guard = useRef(new RequestGuard())
+  const aiGuard = useRef(new RequestGuard(5, 60_000))
   const typeaheadGuard = useRef(new RequestGuard(20, 10_000))
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError(null)
-    fetchFestivals(page, PAGE_SIZE)
+    fetchFestivals(page, PAGE_SIZE, status === '전체' ? undefined : status)
       .then((d) => !cancelled && setData(d))
       .catch((e: Error) => !cancelled && setError(e.message))
       .finally(() => !cancelled && setLoading(false))
@@ -35,18 +48,18 @@ export default function App() {
     return () => {
       cancelled = true
     }
-  }, [page])
+  }, [page, status])
 
-  /** 입력 검증(보안 프로토콜) 통과 시 값, 아니면 null + 에러 메시지 설정 */
-  function guarded(raw: string): string | null {
+  /** 입력 검증(보안 프로토콜) 통과 시 정제된 값, 아니면 null + 에러 메시지 */
+  function guarded(raw: string, g = guard.current): string | null {
     const checked = checkInput(raw)
     if (!checked.ok) {
-      guard.current.reportViolation()
+      g.reportViolation()
       setSearchError(checked.message)
       setSuggestions([])
       return null
     }
-    const blocked = guard.current.allow()
+    const blocked = g.allow()
     if (blocked) {
       setSearchError(blocked)
       return null
@@ -74,28 +87,72 @@ export default function App() {
     }
   }, [query])
 
+  // 주소창 ?q=검색어 로 바로 검색 (공유/테스트용)
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get('q')
+    if (q) {
+      setQuery(q)
+      void runSearch(q)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   async function runSearch(raw: string) {
     setSearchError(null)
+    setDidYouMean(null)
     if (!raw.trim()) {
-      setSearchResults(null)
+      resetToList()
       return
     }
     const q = guarded(raw)
     if (q === null) return
     setSearching(true)
     try {
-      const [results, related] = await Promise.all([
+      const [found, related] = await Promise.all([
         searchFestivals(q),
         suggestFestivals(q).catch(() => [] as string[]),
       ])
-      setSearchResults(results)
+      setResults(found)
+      setMode({ kind: 'search', query: q })
       setSuggestions(related)
+      // 로컬 AI 오타 교정은 느릴 수 있어 결과를 막지 않고 뒤따라 표시
+      correctQuery(q)
+        .then((c) => c.corrected && setDidYouMean(c.corrected))
+        .catch(() => undefined)
     } catch (err) {
-      setSearchResults(null)
+      setResults(null)
       setSearchError((err as Error).message)
     } finally {
       setSearching(false)
     }
+  }
+
+  async function runAsk(raw: string) {
+    setSearchError(null)
+    if (!raw.trim()) return
+    const q = guarded(raw, aiGuard.current)
+    if (q === null) return
+    setAsking(true)
+    try {
+      const r = await askCurator(q)
+      setResults(r.festivals)
+      setMode({ kind: 'ai', question: q, answer: r.answer })
+      setSuggestions([])
+      setDidYouMean(null)
+    } catch (err) {
+      setSearchError((err as Error).message)
+    } finally {
+      setAsking(false)
+    }
+  }
+
+  function resetToList() {
+    setQuery('')
+    setResults(null)
+    setMode({ kind: 'list' })
+    setSearchError(null)
+    setSuggestions([])
+    setDidYouMean(null)
   }
 
   function pickSuggestion(name: string) {
@@ -103,11 +160,10 @@ export default function App() {
     void runSearch(name)
   }
 
-  function clearSearch() {
-    setQuery('')
-    setSearchResults(null)
-    setSearchError(null)
-    setSuggestions([])
+  function changeStatus(s: StatusFilter) {
+    resetToList()
+    setStatus(s)
+    setPage(1)
   }
 
   async function onSummarize(f: Festival) {
@@ -120,7 +176,8 @@ export default function App() {
     }
   }
 
-  const items = searchResults ?? data?.items
+  const items = results ?? data?.items
+  const counts = data?.counts
 
   return (
     <div className="min-h-screen bg-base-200">
@@ -135,10 +192,7 @@ export default function App() {
       <main className="mx-auto max-w-4xl px-4 py-8">
         <header className="mb-6">
           <h1 className="text-2xl font-bold sm:text-3xl">우리 동네 축제, 한눈에 🎉</h1>
-          <p className="mt-1 text-sm opacity-70">
-            공공데이터 기반 · 로컬 AI 한 줄 요약
-            {data && ` · 총 ${data.total.toLocaleString()}건 (${data.page} / ${data.total_pages} 페이지)`}
-          </p>
+          <p className="mt-1 text-sm opacity-70">공공데이터 기반 · 한국관광공사 사진 · 로컬 AI 큐레이션</p>
         </header>
 
         <form
@@ -158,8 +212,8 @@ export default function App() {
               aria-label="축제 검색"
               className="grow"
             />
-            {(searchResults || query) && (
-              <button type="button" onClick={clearSearch} aria-label="검색 초기화" className="opacity-60 hover:opacity-100">
+            {(results || query) && (
+              <button type="button" onClick={resetToList} aria-label="검색 초기화" className="opacity-60 hover:opacity-100">
                 <X size={16} />
               </button>
             )}
@@ -169,6 +223,20 @@ export default function App() {
           </button>
         </form>
 
+        {didYouMean && (
+          <div role="status" className="alert alert-info alert-soft mt-3 py-2 text-sm">
+            <Wand2 size={16} aria-hidden />
+            <span>
+              <span className="badge badge-info badge-sm mr-1">AI</span>
+              혹시 <b>‘{didYouMean}’</b>
+              을(를) 찾으셨나요?
+            </span>
+            <button onClick={() => pickSuggestion(didYouMean)} className="btn btn-xs btn-info">
+              이걸로 검색
+            </button>
+          </div>
+        )}
+
         {suggestions.length > 0 && (
           <div className="mt-3 flex flex-wrap items-center gap-1.5" aria-label="연관검색어">
             <span className="text-xs opacity-60">연관검색어</span>
@@ -177,6 +245,89 @@ export default function App() {
                 {sg}
               </button>
             ))}
+          </div>
+        )}
+
+        <div className="collapse collapse-arrow mt-4 rounded-box border border-base-300 bg-base-100">
+          <input type="checkbox" checked={aiOpen} onChange={(e) => setAiOpen(e.target.checked)} aria-label="AI 큐레이터 열기" />
+          <div className="collapse-title flex items-center gap-2 font-semibold">
+            <Bot size={18} className="text-primary" aria-hidden /> AI 큐레이터에게 물어보기
+            <span className="badge badge-ghost badge-sm">로컬 Qwen</span>
+          </div>
+          <div className="collapse-content">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                void runAsk(question)
+              }}
+              className="join w-full"
+            >
+              <input
+                value={question}
+                onChange={(e) => setQuestion(e.target.value)}
+                maxLength={100}
+                placeholder="예: 아이랑 가기 좋은 겨울 축제"
+                aria-label="AI 큐레이터 질문"
+                className="input join-item flex-1"
+              />
+              <button disabled={asking} className="btn btn-primary join-item">
+                {asking ? <span className="loading loading-spinner loading-xs" /> : <Sparkles size={16} />}
+                {asking ? '생각 중…' : '질문'}
+              </button>
+            </form>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {EXAMPLES.map((ex) => (
+                <button
+                  key={ex}
+                  onClick={() => {
+                    setQuestion(ex)
+                    void runAsk(ex)
+                  }}
+                  className="btn btn-xs btn-ghost rounded-full border border-base-300"
+                >
+                  {ex}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {mode.kind === 'list' ? (
+          <div role="tablist" aria-label="진행 상태" className="tabs tabs-box mt-6 w-fit bg-base-100">
+            {TABS.map((t) => (
+              <button
+                key={t}
+                role="tab"
+                aria-selected={status === t}
+                onClick={() => changeStatus(t)}
+                className={`tab gap-1.5 ${status === t ? 'tab-active' : ''}`}
+              >
+                {t}
+                {counts && <span className="badge badge-sm badge-ghost">{(counts[t] ?? 0).toLocaleString()}</span>}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-6 flex items-center justify-between gap-2 text-sm">
+            <span className="opacity-70">
+              {mode.kind === 'search' ? `‘${mode.query}’ 검색 결과 ${results?.length ?? 0}건` : 'AI 추천 축제'}
+            </span>
+            <button onClick={resetToList} className="btn btn-xs btn-ghost">
+              목록으로
+            </button>
+          </div>
+        )}
+
+        {mode.kind === 'ai' && (
+          <div className="chat chat-start mt-3">
+            <div className="chat-image avatar placeholder">
+              <div className="w-9 rounded-full bg-primary text-primary-content">
+                <Bot size={18} className="m-auto mt-1.5" aria-hidden />
+              </div>
+            </div>
+            <div className="chat-bubble chat-bubble-primary max-w-full whitespace-pre-line text-sm leading-relaxed">
+              {mode.answer}
+            </div>
           </div>
         )}
 
@@ -192,18 +343,16 @@ export default function App() {
           </div>
         )}
 
-        <ul className="mt-6 space-y-3">
-          {loading && !data
+        <ul className="mt-4 space-y-3">
+          {loading && !data && !results
             ? Array.from({ length: 4 }, (_, i) => <CardSkeleton key={i} />)
             : items?.map((f) => (
                 <FestivalCard key={f.id} festival={f} summary={summaries[f.id]} onSummarize={onSummarize} />
               ))}
-          {!loading && items?.length === 0 && (
-            <li className="py-12 text-center opacity-60">표시할 축제가 없습니다.</li>
-          )}
+          {!loading && items?.length === 0 && <li className="py-12 text-center opacity-60">표시할 축제가 없습니다.</li>}
         </ul>
 
-        {!searchResults && data && data.total_pages > 1 && (
+        {mode.kind === 'list' && data && data.total_pages > 1 && (
           <div className="mt-8">
             <Pagination page={page} totalPages={data.total_pages} onChange={setPage} />
           </div>
@@ -211,7 +360,7 @@ export default function App() {
       </main>
 
       <footer className="footer footer-center p-6 text-xs opacity-60">
-        <p>공공데이터포털 전국문화축제표준데이터 · Ollama · ChromaDB · DaisyUI</p>
+        <p>공공데이터포털 전국문화축제표준데이터 · 한국관광공사 TourAPI · Ollama · ChromaDB · DaisyUI</p>
       </footer>
     </div>
   )

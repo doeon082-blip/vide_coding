@@ -13,6 +13,7 @@ from starlette.responses import Response
 # (경로 접두사, 메서드) -> (허용 횟수, 윈도우 초). 위에서부터 먼저 일치하는 규칙 적용.
 RULES: list[tuple[str, str | None, int, int]] = [
     ("/api/festivals/", "POST", 10, 60),  # summarize: Ollama 호출이라 가장 엄격
+    ("/api/ai/", None, 12, 60),  # 로컬 LLM 호출
     ("/api/festivals/search", None, 40, 60),
     ("/api/festivals/suggest", None, 90, 60),
 ]

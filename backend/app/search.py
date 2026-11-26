@@ -93,12 +93,20 @@ def lexical_score(q_raw: str, q: str, e: _Entry) -> float:
     return score
 
 
-def hybrid_search(col: Collection, q_raw: str, limit: int = 10) -> list[FestivalRecord]:
+@dataclass
+class Hit:
+    record: FestivalRecord
+    lexical: float
+    score: float
+
+
+def hybrid_search_scored(col: Collection, q_raw: str, limit: int = 10) -> list[Hit]:
     q = normalize(q_raw)
     entries = _entries(col)
     by_id = {e.record.id: e for e in entries}
 
-    scores: dict[str, float] = {e.record.id: lexical_score(q_raw, q, e) for e in entries}
+    lex = {e.record.id: lexical_score(q_raw, q, e) for e in entries}
+    scores = dict(lex)
 
     vres = col.query(query_texts=[q_raw], n_results=max(limit * 3, 30), include=["metadatas"])
     for rank, vid in enumerate(vres["ids"][0]):
@@ -106,18 +114,36 @@ def hybrid_search(col: Collection, q_raw: str, limit: int = 10) -> list[Festival
             scores[vid] += VECTOR_BONUS / (1 + 0.5 * rank)
 
     ranked = sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
-    out: list[FestivalRecord] = []
-    for rid, sc in ranked[:limit]:
-        if sc > 0:
-            out.append(by_id[rid].record)
-    return out
+    return [Hit(by_id[rid].record, lex[rid], sc) for rid, sc in ranked[:limit] if sc > 0]
+
+
+def hybrid_search(col: Collection, q_raw: str, limit: int = 10) -> list[FestivalRecord]:
+    return [h.record for h in hybrid_search_scored(col, q_raw, limit)]
+
+
+_EDITION = re.compile(r"제?\s*\d+\s*회|20\d{2}\s*년?")
+
+
+def canonical_name(name: str) -> str:
+    """'제29회 보령머드축제' / '2026 보령머드축제' → '보령머드축제' (회차·연도 변형을 한 항목으로 묶는다)"""
+    return re.sub(r"\s+", " ", _EDITION.sub(" ", name)).strip() or name
+
+
+MIN_SUGGEST_SCORE = 0.19  # 어휘 점수가 있거나, 벡터 상위 3위 안일 때만 제안
 
 
 def suggest_names(col: Collection, q_raw: str, limit: int = 6) -> list[str]:
+    seen: set[str] = set()
     names: list[str] = []
-    for r in hybrid_search(col, q_raw, limit=limit * 4):
-        if r.fstvl_nm not in names:
-            names.append(r.fstvl_nm)
+    for h in hybrid_search_scored(col, q_raw, limit=limit * 5):
+        if h.score < MIN_SUGGEST_SCORE:
+            continue
+        name = canonical_name(h.record.fstvl_nm)
+        key = normalize(name)
+        if key in seen:
+            continue
+        seen.add(key)
+        names.append(name)
         if len(names) >= limit:
             break
     return names

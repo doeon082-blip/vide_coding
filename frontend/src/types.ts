@@ -17,6 +17,7 @@ export interface FestivalPage {
   page: number
   size: number
   total_pages: number
+  counts: Record<string, number>
   items: Festival[]
 }
 
@@ -37,4 +38,11 @@ export interface PhotoResult {
   photos: Photo[]
   region: string
   matched_title: string
+}
+
+export type StatusFilter = '전체' | FestivalStatus
+
+export interface AskResult {
+  answer: string
+  festivals: Festival[]
 }

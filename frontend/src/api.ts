@@ -1,4 +1,4 @@
-import type { Festival, FestivalPage, PhotoResult, SummaryResult } from './types'
+import type { AskResult, Festival, FestivalPage, FestivalStatus, PhotoResult, SummaryResult } from './types'
 
 const ENV_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
 
@@ -27,8 +27,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>
 }
 
-export const fetchFestivals = (page: number, size = 10) =>
-  request<FestivalPage>(`/api/festivals?page=${page}&size=${size}`)
+export const fetchFestivals = (page: number, size = 10, status?: FestivalStatus) =>
+  request<FestivalPage>(
+    `/api/festivals?page=${page}&size=${size}${status ? `&status=${encodeURIComponent(status)}` : ''}`,
+  )
 
 export const searchFestivals = (q: string, limit = 10) =>
   request<Festival[]>(`/api/festivals/search?q=${encodeURIComponent(q)}&limit=${limit}`)
@@ -42,3 +44,15 @@ export const summarizeFestival = (id: string) =>
 
 /** 한국관광공사 TourAPI 기반 축제/지역 사진 */
 export const fetchPhotos = (id: string) => request<PhotoResult>(`/api/festivals/${id}/photos`)
+
+/** 로컬 AI 오타 교정 ('혹시 ○○?') */
+export const correctQuery = (q: string) =>
+  request<{ corrected: string | null }>(`/api/ai/correct?q=${encodeURIComponent(q)}`)
+
+/** 로컬 AI 큐레이터 (RAG) */
+export const askCurator = (question: string) =>
+  request<AskResult>('/api/ai/ask', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question }),
+  })
