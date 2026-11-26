@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, computed_field
+from pydantic import BaseModel, computed_field
 
 Status = Literal["진행중", "예정", "완료"]
 
 
 def compute_status(start: str, end: str, today: date | None = None) -> Status | None:
-    """Return 진행중/예정/완료 relative to the server's today, or None if dates are unparseable."""
-    today_s = (today or date.today()).isoformat()  # YYYY-MM-DD compares lexicographically
+    """진행중/예정/완료 relative to the server's today; None if dates are unusable."""
+    today_s = (today or date.today()).isoformat()  # YYYY-MM-DD sorts lexicographically
     start = start.strip() or end.strip()
     end = end.strip() or start
     if len(start) != 10 or len(end) != 10:
@@ -25,17 +25,14 @@ def compute_status(start: str, end: str, today: date | None = None) -> Status | 
 
 
 class FestivalOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
+    id: str
     fstvl_nm: str
     fstvl_start_date: str
     fstvl_end_date: str
     opar: str
     fstvl_co: str
     rdnmadr: str
-    ai_summary: str | None = None
-    ai_summarized_at: datetime | None = None
+    ai_summary: str = ""
 
     @computed_field  # type: ignore[prop-decorator]
     @property
@@ -52,6 +49,6 @@ class FestivalPage(BaseModel):
 
 
 class SummaryOut(BaseModel):
-    id: int
+    id: str
     ai_summary: str
     cached: bool

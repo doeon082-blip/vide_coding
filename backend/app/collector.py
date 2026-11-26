@@ -1,4 +1,4 @@
-"""Public Data Portal festival collector and SQLite upsert script."""
+"""Public Data Portal festival collector and ChromaDB upsert script."""
 
 from __future__ import annotations
 
@@ -16,12 +16,12 @@ from typing import Any
 from urllib.parse import unquote
 
 import httpx
-from sqlalchemy.dialects.sqlite import insert as sqlite_insert
-from sqlalchemy.orm import Session
+from chromadb.api.models.Collection import Collection
 from dotenv import load_dotenv
 
-from app.database import BACKEND_DIR, SessionLocal, init_db
-from app.models import Festival, build_festival_key
+from app.database import BACKEND_DIR, init_db
+from app.logging_config import setup_logging
+from app.models import FestivalRecord, build_festival_key
 
 load_dotenv(BACKEND_DIR / ".env")
 
@@ -113,38 +113,46 @@ def _parse_api_response(response: httpx.Response) -> tuple[list[dict[str, Any]],
     return items, total_count
 
 
-def _map_item_to_row(item: dict[str, Any]) -> dict[str, str] | None:
-    """Map one API item dict into festival column values, skipping rows without a name."""
+def _map_item_to_record(item: dict[str, Any]) -> FestivalRecord | None:
+    """Map one API item into a FestivalRecord, skipping rows without a name."""
     fstvl_nm = _clean_text(item.get("fstvlNm"))
     if not fstvl_nm:
         return None
-
     start = _clean_text(item.get("fstvlStartDate"))
     end = _clean_text(item.get("fstvlEndDate"))
     opar = _clean_text(item.get("opar"))
-    return {
-        "unique_key": build_festival_key(fstvl_nm, start, end, opar),
-        "fstvl_nm": fstvl_nm,
-        "fstvl_start_date": start,
-        "fstvl_end_date": end,
-        "opar": opar,
-        "fstvl_co": _clean_text(item.get("fstvlCo")),
-        "rdnmadr": _clean_text(item.get("rdnmadr")),
-    }
+    return FestivalRecord(
+        id=build_festival_key(fstvl_nm, start, end, opar),
+        fstvl_nm=fstvl_nm,
+        fstvl_start_date=start,
+        fstvl_end_date=end,
+        opar=opar,
+        fstvl_co=_clean_text(item.get("fstvlCo")),
+        rdnmadr=_clean_text(item.get("rdnmadr")),
+    )
 
 
-def upsert_rows(session: Session, rows: list[dict[str, str]], batch_size: int = 500) -> int:
-    """Upsert rows keyed by unique_key; ai_summary columns are never touched."""
-    deduped = {row["unique_key"]: row for row in rows}
-    values = list(deduped.values())
-    now = datetime.now(timezone.utc)
-    for start in range(0, len(values), batch_size):
-        batch = [{**row, "updated_at": now} for row in values[start : start + batch_size]]
-        stmt = sqlite_insert(Festival).values(batch)
-        update_cols = {c: stmt.excluded[c] for c in batch[0] if c != "unique_key"}
-        session.execute(stmt.on_conflict_do_update(index_elements=["unique_key"], set_=update_cols))
-    session.commit()
-    return len(values)
+def upsert_records(collection: Collection, records: list[FestivalRecord], batch_size: int = 50) -> int:
+    """Upsert by id; existing AI summaries are preserved."""
+    unique = list({r.id: r for r in records}.values())  # Chroma rejects duplicate ids in a batch
+    for i in range(0, len(unique), batch_size):
+        batch = unique[i : i + batch_size]
+        existing = collection.get(ids=[r.id for r in batch], include=["metadatas"])
+        prev_by_id = {
+            eid: m for eid, m in zip(existing["ids"], existing["metadatas"] or []) if m
+        }
+        for r in batch:
+            prev = prev_by_id.get(r.id)
+            if prev:
+                r.ai_summary = str(prev.get("ai_summary") or "")
+                r.ai_summarized_at = str(prev.get("ai_summarized_at") or "")
+        collection.upsert(
+            ids=[r.id for r in batch],
+            documents=[r.to_document() for r in batch],
+            metadatas=[r.to_metadata() for r in batch],
+        )
+        logger.info("Upserted %d/%d", min(i + batch_size, len(unique)), len(unique))
+    return len(unique)
 
 
 async def fetch_all_festivals(
@@ -152,10 +160,10 @@ async def fetch_all_festivals(
     api_url: str,
     num_of_rows: int = 100,
     transport: httpx.AsyncBaseTransport | None = None,
-) -> tuple[list[dict[str, str]], int, int, int]:
+) -> tuple[list[FestivalRecord], int, int, int]:
     """Fetch every page of festival data from the Public Data Portal API."""
     normalized_key = normalize_service_key(api_key)
-    all_records: list[dict[str, str]] = []
+    all_records: list[FestivalRecord] = []
     skipped_rows = 0
     pages_fetched = 0
     total_count = 0
@@ -182,7 +190,7 @@ async def fetch_all_festivals(
                 total_pages = max(1, math.ceil(total_count / num_of_rows)) if total_count else 1
 
             for item in items:
-                record = _map_item_to_row(item)
+                record = _map_item_to_record(item)
                 if record is None:
                     skipped_rows += 1
                 else:
@@ -200,10 +208,10 @@ async def fetch_all_festivals(
 
 async def collect_and_store(
     num_of_rows: int = 100,
-    session: Session | None = None,
+    collection: Collection | None = None,
     transport: httpx.AsyncBaseTransport | None = None,
 ) -> CollectionStats:
-    """Collect all festivals from Public Data Portal and upsert into SQLite."""
+    """Collect all festivals from Public Data Portal and upsert into ChromaDB."""
     raw_api_key = os.getenv("PUBLIC_DATA_API_KEY") or ""
     if raw_api_key.strip() in PLACEHOLDER_KEYS:
         raise RuntimeError(
@@ -218,14 +226,7 @@ async def collect_and_store(
         transport=transport,
     )
 
-    init_db()
-    owns_session = session is None
-    db = session or SessionLocal()
-    try:
-        upserted = upsert_rows(db, records)
-    finally:
-        if owns_session:
-            db.close()
+    upserted = upsert_records(collection or init_db(), records)
 
     return CollectionStats(
         total_count=total_count,
@@ -237,14 +238,9 @@ async def collect_and_store(
 
 
 def main() -> None:
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(message)s",
-    )
-    # httpx logs full request URLs at INFO, which would leak serviceKey.
-    logging.getLogger("httpx").setLevel(logging.WARNING)
+    setup_logging()
     parser = argparse.ArgumentParser(
-        description="Collect Korean cultural festival data and store in SQLite."
+        description="Collect Korean cultural festival data and store in ChromaDB."
     )
     parser.add_argument(
         "--page-size",
@@ -254,6 +250,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    logger.info("Collection started")
     stats = asyncio.run(collect_and_store(num_of_rows=args.page_size))
     print(
         f"Collection complete: totalCount={stats.total_count}, "

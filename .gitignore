@@ -21,6 +21,10 @@ __pycache__/
 *.sqlite3
 chroma_db/
 
+# Logs
+logs/
+*.log
+
 # Node / Frontend
 node_modules/
 dist/

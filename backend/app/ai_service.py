@@ -2,23 +2,27 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 import time
 from datetime import datetime, timezone
 
 import httpx
-from sqlalchemy.orm import Session
+from chromadb.api.models.Collection import Collection
 
 from app.database import BACKEND_DIR  # noqa: F401  (ensures .env is loaded)
-from app.models import Festival
+from app.models import FestivalRecord
+
+
+logger = logging.getLogger(__name__)
 
 
 class AIServiceError(RuntimeError):
     """Raised when the local Ollama server cannot produce a summary."""
 
 
-def _build_prompt(f: Festival) -> str:
+def _build_prompt(f: FestivalRecord) -> str:
     parts = [f"축제명: {f.fstvl_nm}", f"기간: {f.fstvl_start_date} ~ {f.fstvl_end_date}"]
     if f.opar:
         parts.append(f"장소: {f.opar}")
@@ -39,7 +43,7 @@ def _clean(text: str) -> str:
     return text.splitlines()[0].strip() if text else ""
 
 
-def generate_summary(festival: Festival) -> str:
+def generate_summary(festival: FestivalRecord) -> str:
     base = (os.getenv("OLLAMA_BASE_URL") or "http://localhost:11434").rstrip("/")
     model = (os.getenv("OLLAMA_MODEL") or "qwen3:4b").strip()
     payload = {
@@ -58,6 +62,7 @@ def generate_summary(festival: Festival) -> str:
             break
         except httpx.HTTPError as exc:
             last_exc = exc
+            logger.warning("Ollama call failed (attempt %d): %s", attempt + 1, exc)
             time.sleep(2)
     else:
         raise AIServiceError(f"Ollama 호출 실패({base}, model={model}): {last_exc}") from last_exc
@@ -67,11 +72,14 @@ def generate_summary(festival: Festival) -> str:
     return summary
 
 
-def summarize_festival(db: Session, festival: Festival) -> tuple[str, bool]:
+def summarize_festival(collection: Collection, festival: FestivalRecord) -> tuple[str, bool]:
     """Return (summary, cached). Calls Ollama only when no cached summary exists."""
     if festival.ai_summary:
+        logger.info("Summary cache hit id=%s", festival.id[:8])
         return festival.ai_summary, True
     festival.ai_summary = generate_summary(festival)
-    festival.ai_summarized_at = datetime.now(timezone.utc)
-    db.commit()
+    festival.ai_summarized_at = datetime.now(timezone.utc).isoformat()
+    # metadata-only update: no re-embedding
+    collection.update(ids=[festival.id], metadatas=[festival.to_metadata()])
+    logger.info("Summary generated id=%s", festival.id[:8])
     return festival.ai_summary, False

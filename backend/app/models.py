@@ -1,47 +1,53 @@
-"""Festival table schema."""
+"""Festival record model stored as ChromaDB document + metadata."""
 
 from __future__ import annotations
 
 import hashlib
 from datetime import datetime, timezone
+from typing import Any
 
-from sqlalchemy import DateTime, Integer, String, Text
-from sqlalchemy.orm import Mapped, mapped_column
-
-from app.database import Base
+from pydantic import BaseModel, Field
 
 
 def build_festival_key(
-    fstvl_nm: str,
-    fstvl_start_date: str,
-    fstvl_end_date: str,
-    opar: str | None = None,
+    fstvl_nm: str, fstvl_start_date: str, fstvl_end_date: str, opar: str | None = None
 ) -> str:
-    """Deterministic SHA-256 key used to make upserts idempotent."""
+    """Deterministic SHA-256 id so re-running the collector upserts instead of duplicating."""
     normalized = "|".join(
-        part.strip() for part in (fstvl_nm, fstvl_start_date, fstvl_end_date, opar or "")
+        p.strip() for p in (fstvl_nm, fstvl_start_date, fstvl_end_date, opar or "")
     )
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
 
-def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+class FestivalRecord(BaseModel):
+    id: str
+    fstvl_nm: str
+    fstvl_start_date: str = ""
+    fstvl_end_date: str = ""
+    opar: str = ""
+    fstvl_co: str = ""
+    rdnmadr: str = ""
+    ai_summary: str = ""
+    ai_summarized_at: str = ""
+    updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
+    def to_document(self) -> str:
+        """Text that gets embedded (semantic search target)."""
+        parts = [f"축제명: {self.fstvl_nm}", f"기간: {self.fstvl_start_date} ~ {self.fstvl_end_date}"]
+        if self.opar:
+            parts.append(f"개최장소: {self.opar}")
+        if self.rdnmadr:
+            parts.append(f"도로명주소: {self.rdnmadr}")
+        if self.fstvl_co:
+            parts.append(f"축제내용: {self.fstvl_co}")
+        return "\n".join(parts)
 
-class Festival(Base):
-    __tablename__ = "festivals"
+    def to_metadata(self) -> dict[str, str]:
+        data = self.model_dump()
+        data.pop("id")
+        return data
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    # 중복 방지용 고유 키 (축제명 + 시작일 + 종료일 + 개최장소)
-    unique_key: Mapped[str] = mapped_column(String(64), unique=True, index=True)
-
-    fstvl_nm: Mapped[str] = mapped_column(String(300))
-    fstvl_start_date: Mapped[str] = mapped_column(String(10), default="", index=True)
-    fstvl_end_date: Mapped[str] = mapped_column(String(10), default="")
-    opar: Mapped[str] = mapped_column(String(300), default="")
-    fstvl_co: Mapped[str] = mapped_column(Text, default="")
-    rdnmadr: Mapped[str] = mapped_column(String(300), default="")
-
-    ai_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
-    ai_summarized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, onupdate=_utcnow)
+    @classmethod
+    def from_chroma(cls, doc_id: str, metadata: dict[str, Any] | None) -> FestivalRecord:
+        meta = {k: str(v) for k, v in (metadata or {}).items() if v is not None}
+        return cls(id=doc_id, **{k: v for k, v in meta.items() if k in cls.model_fields})
