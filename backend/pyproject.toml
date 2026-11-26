@@ -1,0 +1,15 @@
+[project]
+name = "festival-backend"
+version = "0.1.0"
+description = "Festival info + local AI curation backend"
+authors = [
+    { name = "귀염뽀작도언이", email = "doeon082@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.165.0",
+    "httpx>=0.28.1",
+    "python-dotenv>=1.2.4",
+    "sqlalchemy>=2.1.9",
+    "uvicorn>=0.54.0",
+]
