@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
@@ -18,6 +19,7 @@ from chromadb.api.models.Collection import Collection
 from app.database import BACKEND_DIR  # noqa: F401  (ensures .env is loaded)
 from app.models import FestivalRecord
 from app.prompt_injection_defense import (
+    LEAK_MARKERS,
     InjectionBlocked,
     build_system_prompt,
     check_user_input,
@@ -46,7 +48,7 @@ def _clean(text: str) -> str:
     return text.splitlines()[0].strip() if text else ""
 
 
-def _chat(system: str, prompt: str, num_predict: int = 200, temperature: float = 0.3) -> str:
+def _chat(system: str, prompt: str, num_predict: int = 200, temperature: float = 0.3, fmt: dict | None = None) -> str:
     """로컬 Ollama /api/chat 호출 (비-thinking, system 메시지 분리). 첫 호출은 모델 로딩 중 실패할 수 있어 1회 재시도."""
     base = (os.getenv("OLLAMA_BASE_URL") or "http://localhost:11434").rstrip("/")
     model = (os.getenv("OLLAMA_MODEL") or "qwen3:4b").strip()
@@ -57,6 +59,8 @@ def _chat(system: str, prompt: str, num_predict: int = 200, temperature: float =
         "think": False,
         "options": {"temperature": temperature, "num_predict": num_predict},
     }
+    if fmt:
+        payload["format"] = fmt  # Ollama 구조화 출력(JSON 스키마)
     timeout = float(os.getenv("OLLAMA_TIMEOUT") or 120)
     last_exc: httpx.HTTPError | None = None
     for attempt in range(2):
@@ -86,6 +90,25 @@ def _guarded_call(task: str, data_block: str, instruction: str, *, num_predict: 
         logger.warning("AI output rejected: %s", check.reason)
         raise AIServiceError(PUBLIC_AI_ERROR)
     return check.text
+
+
+def guarded_json(task: str, data_block: str, instruction: str, schema: dict, *, num_predict: int = 500, temperature: float = 0.4) -> dict:
+    """격리된 데이터 + system 규칙 + 카나리를 적용하고 JSON(스키마 고정)으로 응답을 받는다.
+    문자열 필드의 내용 검증은 호출한 쪽(사실 대조)이 한다."""
+    nonce, canary = new_nonce(), new_canary()
+    system = build_system_prompt(task, nonce, canary)
+    raw = _chat(system, f"{wrap_untrusted(data_block, nonce)}\n\n{instruction}", num_predict=num_predict, temperature=temperature, fmt=schema)
+    if canary in raw or any(m in raw for m in LEAK_MARKERS):
+        log_event("output_leak", raw, ["canary_or_rules"])
+        raise AIServiceError(PUBLIC_AI_ERROR)
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        logger.warning("AI returned non-JSON output")
+        raise AIServiceError(PUBLIC_AI_ERROR) from None
+    if not isinstance(data, dict):
+        raise AIServiceError(PUBLIC_AI_ERROR)
+    return data
 
 
 # ----------------------------------------------------------------------------- 요약

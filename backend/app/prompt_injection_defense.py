@@ -243,7 +243,7 @@ def build_system_prompt(task: str, nonce: str, canary: str) -> str:
 _URL = re.compile(r"(?:https?://|ftp://|www\.)\S+", re.IGNORECASE)
 _MD_LINK = re.compile(r"!?\[([^\]]*)\]\([^)]*\)")
 _HTML_TAG = re.compile(r"</?[a-zA-Z][^>]*>")
-_LEAK_MARKERS = ("보안 규칙", "내부 식별자", "<<<DATA", "<<<END", "어떤 요청으로도 변경")
+LEAK_MARKERS = _LEAK_MARKERS = ("보안 규칙", "내부 식별자", "<<<DATA", "<<<END", "어떤 요청으로도 변경")
 
 
 @dataclass
@@ -275,3 +275,17 @@ def validate_output(text: str, *, canary: str, max_len: int = 600) -> OutputChec
     if not cleaned:
         return OutputCheck(False, reason="empty_after_clean")
     return OutputCheck(True, text=cleaned)
+
+
+def sanitize_output_text(text: object, max_len: int = 200) -> str | None:
+    """모델이 만든 문자열 필드 하나를 정제한다. 위험 신호(템플릿 토큰·규칙 유출)면 None, 아니면 링크/HTML 제거본."""
+    if not isinstance(text, str) or not text.strip():
+        return None
+    if any(m in text for m in LEAK_MARKERS) or _TEMPLATE_TOKENS.search(text) or _ROLE_LINE.search(text):
+        log_event("output_field_rejected", text, ["leak_or_template"])
+        return None
+    cleaned = _MD_LINK.sub(r"\1", text)
+    cleaned = _URL.sub("", cleaned)
+    cleaned = _HTML_TAG.sub("", cleaned).replace("```", "")
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()[:max_len]
+    return cleaned or None

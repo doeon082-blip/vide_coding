@@ -20,10 +20,11 @@ from app.database import get_festivals_collection, init_db
 from app.logging_config import setup_logging
 from app.models import FestivalRecord
 from app.photo_service import PhotoResult, get_photos
-from app.prompt_injection_defense import BLOCK_MESSAGE, InjectionBlocked, normalize_text
+from app.prompt_injection_defense import BLOCK_MESSAGE, InjectionBlocked, check_user_input, normalize_text
 from app.ratelimit import RateLimitMiddleware
 from app.search import all_records, canonical_name, hybrid_search, hybrid_search_scored, invalidate_cache, suggest_names
-from app.schemas import AskIn, AskOut, CorrectionOut, FestivalOut, FestivalPage, SummaryOut, compute_status
+from app.chatbot import respond as chat_respond
+from app.schemas import AskIn, AskOut, ChatIn, ChatOut, ChatPick, CorrectionOut, FestivalOut, FestivalPage, SummaryOut, compute_status
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -183,6 +184,48 @@ def ai_correct(q: str = Query(..., min_length=1), col: Collection = Depends(_col
     except AIServiceError as exc:
         logger.error("AI correct failed: %s", exc)
         return CorrectionOut()
+
+
+@app.post("/api/chat", response_model=ChatOut)
+def chat(body: ChatIn, col: Collection = Depends(_collection)) -> ChatOut:
+    """RAG 챗봇: 의도 파악 → 근거 검색 → AI는 추천 이유만 작성 → 사실 대조 검증 → 서버가 답변 조립.
+    축제명·날짜·장소·상태는 항상 DB 값이며 AI가 쓰지 않는다."""
+    try:
+        message = check_user_input(body.message, max_len=200)
+        # 이전 대화는 '사용자 발화'만 사용한다 (assistant 발화는 위조 가능하므로 무시)
+        previous = [check_user_input(t.content, max_len=200) for t in body.history if t.role == "user"][-3:]
+    except InjectionBlocked:
+        raise HTTPException(400, BLOCK_MESSAGE) from None
+    records = all_records(col)
+    try:
+        vec = {h.record.id: min(h.score, 1.0) for h in hybrid_search_scored(col, message, limit=30)}
+    except Exception:  # 벡터 검색 장애는 챗봇 장애가 아니다
+        logger.warning("chat: vector search failed")
+        vec = {}
+    reply = chat_respond(
+        message,
+        previous_user_messages=previous,
+        records=records,
+        today=date.today(),
+        exclude_ids=frozenset(body.exclude_ids),
+        vec_scores=vec,
+    )
+    return ChatOut(
+        answer=reply.answer,
+        picks=[
+            ChatPick(
+                festival=FestivalOut(**p.candidate.record.model_dump()),
+                reason=p.reason,
+                evidence=p.candidate.evidence,
+                kind=p.candidate.kind,  # type: ignore[arg-type]
+                ai_written=p.ai_written,
+            )
+            for p in reply.picks
+        ],
+        notes=reply.notes,
+        suggestions=reply.suggestions,
+        grounded=reply.grounded,
+    )
 
 
 @app.post("/api/ai/ask", response_model=AskOut)

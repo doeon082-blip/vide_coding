@@ -14,6 +14,7 @@ from starlette.responses import Response
 RULES: list[tuple[str, str | None, int, int]] = [
     ("/api/festivals/", "POST", 10, 60),  # summarize: Ollama 호출이라 가장 엄격
     ("/api/ai/", None, 12, 60),  # 로컬 LLM 호출
+    ("/api/chat", None, 20, 60),  # 챗봇(RAG)
     ("/api/festivals/search", None, 40, 60),
     ("/api/festivals/suggest", None, 90, 60),
 ]

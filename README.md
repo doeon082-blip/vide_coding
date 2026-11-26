@@ -62,6 +62,26 @@ npm run dev                                # http://localhost:5173
 npm run build                              # 배포용 빌드 (dist/)
 ```
 
+### macOS / Linux에서 실행
+코드는 `pathlib`·표준 라이브러리만 쓰고 Windows 전용 코드는 없어서 그대로 동작합니다(실제 Mac에서 돌려 보지는 못했습니다). 다른 점은 설치 명령뿐입니다.
+```bash
+# 도구 설치 (macOS, Homebrew)
+brew install uv node ollama
+brew install cloudflared        # 배포(터널)할 때만
+ollama serve &                  # 또는 Ollama 앱 실행
+ollama pull qwen3.5:4b && ollama pull qwen3-embedding:4b
+
+git clone https://github.com/doeon082-blip/vide_coding.git && cd vide_coding
+cd backend
+cp .env.example .env            # PUBLIC_DATA_API_KEY 입력 (.env는 저장소에 없으므로 기기마다 새로 만듦)
+uv sync && uv run python -m app.collector      # 벡터 DB(chroma_db)도 저장소에 없으므로 기기마다 다시 수집(약 1분)
+uv run uvicorn app.main:app --port 8000 --no-proxy-headers
+# 다른 터미널
+cd frontend && cp .env.example .env && npm install && npm run dev
+```
+- Apple Silicon은 Ollama가 Metal(GPU)을 써서 Windows CPU보다 빠른 편입니다.
+- Linux는 `brew` 대신 각 배포판 패키지 매니저/공식 설치 스크립트로 `uv`, `node`, `ollama`, `cloudflared`를 설치하면 됩니다.
+
 ## API
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
@@ -71,7 +91,8 @@ npm run build                              # 배포용 빌드 (dist/)
 | GET | `/api/festivals/suggest?q=충장추제` | 연관검색어: 하이브리드 랭킹 상위 축제명 (오타 교정 포함) |
 | GET | `/api/festivals/{id}/photos` | **한국관광공사 TourAPI** 사진: 축제 사진 → 없으면 같은 시·군 관광지 사진(`kind: region`). 디스크 캐시 |
 | GET | `/api/ai/correct?q=산천어추제` | **로컬 AI 오타 교정**: 후보 축제명 중 의도한 것을 골라 "혹시 ○○?" 제안 |
-| POST | `/api/ai/ask` | **로컬 AI 큐레이터(RAG)**: 질문 → 관련 축제 검색 → 검색 결과만 근거로 추천 답변 |
+| POST | `/api/chat` | **RAG 챗봇**: 의도 파악 → 근거 검색 → AI는 추천 이유만 작성 → 사실 대조 검증. 축제명·일정·장소·상태는 항상 DB 값 |
+| POST | `/api/ai/ask` | 단발성 AI 큐레이터(레거시, 화면에서는 챗봇으로 대체) |
 | GET | `/api/health` | 상태 확인 |
 
 ## 환경변수 (`backend/.env`)
@@ -88,9 +109,34 @@ npm run build                              # 배포용 빌드 (dist/)
 - 10개 단위 페이지네이션, 진행중/예정/완료 배지
 - 의미 기반 검색 + **오타 시 관련 연관검색어 칩** 제안(클릭하면 바로 검색)
 - 카드 커버(실제 사진 또는 축제명 기반 테마 타일), 축제 소개문, **사진 갤러리**(한국관광공사)
+- **🧚 축제 요정 챗봇(RAG)**: "단풍 보고 싶어", "이번 주말에 갈 만한 축제"처럼 물으면 데이터에서 근거를 찾아 추천(아래 상세)
 - **진행중 / 예정 / 완료 탭**(건수 표시)
-- **로컬 AI 활용**: ① 한 줄 요약(캐싱) ② 오타 교정 "혹시 ○○을(를) 찾으셨나요?" ③ AI 큐레이터에게 자연어로 질문(예: "아이랑 가기 좋은 겨울 축제")
+- **로컬 AI 활용**: ① 한 줄 요약(캐싱) ② 오타 교정 "혹시 ○○을(를) 찾으셨나요?" ③ 축제 요정 챗봇(근거 기반 추천)
 - DaisyUI 테마(기본 cupcake, 다크 모드 시스템 설정이면 dracula 자동 적용), 로딩 스켈레톤, 반응형 레이아웃
+
+## 🧚 축제 요정 챗봇 (RAG, `backend/app/chatbot.py`)
+핵심 원칙: **사실은 DB가, 말투는 AI가.** AI가 틀리거나 지어내도 사용자에게 나가지 않게 설계했습니다.
+
+```
+질문 → ① 의도 파악(규칙) → ② 근거 검색 → (후보 0건이면 AI 호출 없이 "없어요")
+     → ③ AI가 '추천 이유' 한 문장만 작성 → ④ 사실 대조 검증 → ⑤ 서버가 답변 조립
+```
+| 단계 | 내용 |
+|------|------|
+| ① 의도 파악 | 주제(단풍·벚꽃·야경·먹거리…), 시기(이번 주말/12월/가을…), 지역, "지난 것 포함" 여부를 **규칙 기반**으로 추출(LLM 오해석 없음). 후속 질문("제주는?", "더 보여줘")은 이전 사용자 질문을 이어받음 |
+| ② 근거 검색 | 단어가 축제명·소개문에 **실제로 있는** 축제만 후보. 어떤 단어가 어디서 맞았는지(근거)를 화면에 표시. 한 글자 키워드(`꽃`→`불꽃`)·확장어만 맞은 약한 후보·취소된 행사는 제외 |
+| ③ 생성 | LLM은 후보별 추천 이유만 작성(JSON 스키마 고정). 인사말은 고정 템플릿 |
+| ④ 검증 | 이유 문장의 **숫자가 원문에 없거나**, **다른 축제명**·원문에 없는 가격/주차/예약 같은 정보가 있거나, 근거 없는 단어가 많으면 **AI 문장을 버리고** 근거 기반 템플릿으로 대체 |
+| ⑤ 조립 | 축제명·날짜·장소·상태는 AI가 쓰지 않고 DB 값을 그대로 사용 |
+
+정직하게 답하는 경우:
+- **지금 갈 수 있는 게 없을 때**: 예) 오늘(2026-11-26) 기준 단풍 축제는 7건 모두 "완료" → "지금 열리거나 예정된 단풍 축제는 데이터에 없어요"라고 말하고, 끝난 축제는 **"지난 개최(참고용)"** 배지로만 보여줌. 내년 일정은 단정하지 않음
+- **데이터에 없는 정보**(입장료·주차·예약·교통·날씨·운영시간·연락처·숙박)를 물으면 AI가 아니라 서버가 "데이터에 없어요, 공식 홈페이지를 확인하세요"라고 안내
+- **없는 주제**는 지어내지 않고 "찾지 못했어요"
+
+검증: `uv run pytest`(챗봇 테스트에 *가짜 LLM이 거짓말하는 상황* 포함), 실전 평가 `uv run python -m tests.live_eval_chatbot`
+(실제 데이터+실제 Qwen, 질문 20개 → **추천 49건 중 사실 위반 0건**, AI 문장 24건 채택/25건 템플릿 대체).
+한계: 4B 모델이라 AI 문장이 가끔 어색하고(문법), 검증이 엄격해 템플릿 문장이 자주 쓰입니다. 데이터에 없는 정보는 알 수 없고, 검색 품질은 데이터 소개문의 충실도에 좌우됩니다.
 
 ## 보안
 방어는 **프론트(빠른 차단) → 서버(최종 방어)** 두 겹이고, 외부로 공개되는 건 이 백엔드뿐입니다.
@@ -105,6 +151,7 @@ npm run build                              # 배포용 빌드 (dist/)
 | 공격면 축소 | `/docs`, `/openapi.json`은 기본 비공개(`ENABLE_DOCS=on`일 때만 공개), CORS는 `CORS_ORIGINS` 허용 출처만 | `main.py` |
 | XSS | React가 모든 텍스트를 이스케이프하며 `dangerouslySetInnerHTML`을 쓰지 않음. 외부 이미지는 `https` + `tong.visitkorea.or.kr`만 렌더링(백엔드·프론트 이중 검사), 외부 링크는 `rel="noopener noreferrer"` | `photo_service.py`, `security.ts` |
 | 프롬프트 인젝션 | 4겹 방어(아래 상세): 정제 → 탐지/차단 → 데이터 격리 → 출력 검증. AI에게 도구·파일·네트워크 권한 없음 | `prompt_injection_defense.py`, `ai_service.py` |
+| 챗봇 입력 | 질문 200자 제한, 대화 기록은 **사용자 발화만** 사용(assistant 발화 위조 무시)하고 기록 속 인젝션도 차단, 분당 20회 제한 | `main.py`, `chatbot.py` |
 | 응답 헤더 | `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `CSP: default-src 'none'`, `Cache-Control: no-store` | `main.py` |
 | 프론트 CSP | 빌드 결과에 CSP 메타 적용(스크립트/스타일은 같은 출처만, 이미지는 한국관광공사 도메인만) | `vite.config.ts` |
 | 오류 정보 노출 | AI 오류는 일반 메시지만 반환(내부 주소·모델명·예외 상세는 서버 로그에만) | `ai_service.py` |

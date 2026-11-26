@@ -1,4 +1,4 @@
-import type { AskResult, Festival, FestivalPage, FestivalStatus, PhotoResult, SummaryResult } from './types'
+import type { AskResult, ChatResult, Festival, FestivalPage, FestivalStatus, PhotoResult, SummaryResult } from './types'
 
 const ENV_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
 
@@ -55,4 +55,12 @@ export const askCurator = (question: string) =>
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ question }),
+  })
+
+/** 근거 기반 RAG 챗봇 (축제 정보는 DB 값, AI는 추천 이유만) */
+export const sendChat = (message: string, history: { role: 'user' | 'assistant'; content: string }[], excludeIds: string[]) =>
+  request<ChatResult>('/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, history, exclude_ids: excludeIds }),
   })

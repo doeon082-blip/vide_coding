@@ -47,3 +47,19 @@ export interface AskResult {
   answer: string
   festivals: Festival[]
 }
+
+export interface ChatPick {
+  festival: Festival
+  reason: string
+  evidence: string[]
+  kind: 'active' | 'past'
+  ai_written: boolean
+}
+
+export interface ChatResult {
+  answer: string
+  picks: ChatPick[]
+  notes: string[]
+  suggestions: string[]
+  grounded: boolean
+}

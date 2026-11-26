@@ -132,7 +132,7 @@ def hybrid_search(col: Collection, q_raw: str, limit: int = 10) -> list[Festival
     return [h.record for h in hybrid_search_scored(col, q_raw, limit)]
 
 
-_EDITION = re.compile(r"제?\s*\d+\s*회|20\d{2}\s*년?")
+_EDITION = re.compile(r"제?\s*\d+\s*회|20\d{2}\s*년?")
 
 
 def canonical_name(name: str) -> str:

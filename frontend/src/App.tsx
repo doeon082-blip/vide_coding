@@ -1,16 +1,16 @@
-import { Bot, PartyPopper, Search, ShieldAlert, Sparkles, Wand2, X } from 'lucide-react'
+import { PartyPopper, Search, ShieldAlert, Wand2, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { askCurator, correctQuery, fetchFestivals, searchFestivals, suggestFestivals, summarizeFestival } from './api'
+import { correctQuery, fetchFestivals, searchFestivals, suggestFestivals, summarizeFestival } from './api'
 import { CardSkeleton, Pagination } from './components'
+import { ChatWidget } from './ChatWidget'
 import { FestivalCard, type SummaryState } from './FestivalCard'
 import { checkInput, RequestGuard } from './security'
 import type { Festival, FestivalPage, StatusFilter } from './types'
 
 const PAGE_SIZE = 10
 const TABS: StatusFilter[] = ['전체', '진행중', '예정', '완료']
-const EXAMPLES = ['아이랑 가기 좋은 겨울 축제', '지금 열리고 있는 축제 추천해줘', '먹거리가 좋은 축제는?']
 
-type Mode = { kind: 'list' } | { kind: 'search'; query: string } | { kind: 'ai'; question: string; answer: string }
+type Mode = { kind: 'list' } | { kind: 'search'; query: string }
 
 export default function App() {
   const [page, setPage] = useState(1)
@@ -27,13 +27,8 @@ export default function App() {
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [didYouMean, setDidYouMean] = useState<string | null>(null)
 
-  const [aiOpen, setAiOpen] = useState(false)
-  const [question, setQuestion] = useState('')
-  const [asking, setAsking] = useState(false)
-
   const [summaries, setSummaries] = useState<Record<string, SummaryState>>({})
   const guard = useRef(new RequestGuard())
-  const aiGuard = useRef(new RequestGuard(5, 60_000))
   const typeaheadGuard = useRef(new RequestGuard(20, 10_000))
 
   useEffect(() => {
@@ -124,25 +119,6 @@ export default function App() {
       setSearchError((err as Error).message)
     } finally {
       setSearching(false)
-    }
-  }
-
-  async function runAsk(raw: string) {
-    setSearchError(null)
-    if (!raw.trim()) return
-    const q = guarded(raw, aiGuard.current, true)
-    if (q === null) return
-    setAsking(true)
-    try {
-      const r = await askCurator(q)
-      setResults(r.festivals)
-      setMode({ kind: 'ai', question: q, answer: r.answer })
-      setSuggestions([])
-      setDidYouMean(null)
-    } catch (err) {
-      setSearchError((err as Error).message)
-    } finally {
-      setAsking(false)
     }
   }
 
@@ -248,50 +224,6 @@ export default function App() {
           </div>
         )}
 
-        <div className="collapse collapse-arrow mt-4 rounded-box border border-base-300 bg-base-100">
-          <input type="checkbox" checked={aiOpen} onChange={(e) => setAiOpen(e.target.checked)} aria-label="AI 큐레이터 열기" />
-          <div className="collapse-title flex items-center gap-2 font-semibold">
-            <Bot size={18} className="text-primary" aria-hidden /> AI 큐레이터에게 물어보기
-            <span className="badge badge-ghost badge-sm">로컬 Qwen</span>
-          </div>
-          <div className="collapse-content">
-            <form
-              onSubmit={(e) => {
-                e.preventDefault()
-                void runAsk(question)
-              }}
-              className="join w-full"
-            >
-              <input
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                maxLength={100}
-                placeholder="예: 아이랑 가기 좋은 겨울 축제"
-                aria-label="AI 큐레이터 질문"
-                className="input join-item flex-1"
-              />
-              <button disabled={asking} className="btn btn-primary join-item">
-                {asking ? <span className="loading loading-spinner loading-xs" /> : <Sparkles size={16} />}
-                {asking ? '생각 중…' : '질문'}
-              </button>
-            </form>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {EXAMPLES.map((ex) => (
-                <button
-                  key={ex}
-                  onClick={() => {
-                    setQuestion(ex)
-                    void runAsk(ex)
-                  }}
-                  className="btn btn-xs btn-ghost rounded-full border border-base-300"
-                >
-                  {ex}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
         {mode.kind === 'list' ? (
           <div role="tablist" aria-label="진행 상태" className="tabs tabs-box mt-6 w-fit bg-base-100">
             {TABS.map((t) => (
@@ -310,24 +242,11 @@ export default function App() {
         ) : (
           <div className="mt-6 flex items-center justify-between gap-2 text-sm">
             <span className="opacity-70">
-              {mode.kind === 'search' ? `‘${mode.query}’ 검색 결과 ${results?.length ?? 0}건` : 'AI 추천 축제'}
+              {`‘${mode.query}’ 검색 결과 ${results?.length ?? 0}건`}
             </span>
             <button onClick={resetToList} className="btn btn-xs btn-ghost">
               목록으로
             </button>
-          </div>
-        )}
-
-        {mode.kind === 'ai' && (
-          <div className="chat chat-start mt-3">
-            <div className="chat-image avatar placeholder">
-              <div className="w-9 rounded-full bg-primary text-primary-content">
-                <Bot size={18} className="m-auto mt-1.5" aria-hidden />
-              </div>
-            </div>
-            <div className="chat-bubble chat-bubble-primary max-w-full whitespace-pre-line text-sm leading-relaxed">
-              {mode.answer}
-            </div>
           </div>
         )}
 
@@ -358,6 +277,8 @@ export default function App() {
           </div>
         )}
       </main>
+
+      <ChatWidget onOpenFestival={pickSuggestion} />
 
       <footer className="footer footer-center p-6 text-xs opacity-60">
         <p>공공데이터포털 전국문화축제표준데이터 · 한국관광공사 TourAPI · Ollama · ChromaDB · DaisyUI</p>

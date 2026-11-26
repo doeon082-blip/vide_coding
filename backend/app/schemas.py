@@ -66,3 +66,30 @@ class AskIn(BaseModel):
 class AskOut(BaseModel):
     answer: str
     festivals: list[FestivalOut]
+
+
+class ChatTurn(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(max_length=200)
+
+
+class ChatIn(BaseModel):
+    message: str = Field(min_length=1, max_length=200)
+    history: list[ChatTurn] = Field(default_factory=list, max_length=8)
+    exclude_ids: list[str] = Field(default_factory=list, max_length=40)
+
+
+class ChatPick(BaseModel):
+    festival: FestivalOut
+    reason: str
+    evidence: list[str]
+    kind: Literal["active", "past"]
+    ai_written: bool
+
+
+class ChatOut(BaseModel):
+    answer: str
+    picks: list[ChatPick]
+    notes: list[str]
+    suggestions: list[str]
+    grounded: bool = True
