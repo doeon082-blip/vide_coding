@@ -52,7 +52,7 @@ cd backend
 cp .env.example .env                       # PUBLIC_DATA_API_KEY 입력
 uv sync
 uv run python -m app.collector             # 전체 수집 → 임베딩 → ChromaDB (약 1분, 재실행해도 중복 없음)
-uv run uvicorn app.main:app --port 8000
+uv run uvicorn app.main:app --port 8000 --no-proxy-headers   # 요청 제한이 위조 헤더에 속지 않도록
 
 # 2) 프론트엔드
 cd frontend
@@ -93,12 +93,20 @@ npm run build                              # 배포용 빌드 (dist/)
 - DaisyUI 테마(기본 cupcake, 다크 모드 시스템 설정이면 dracula 자동 적용), 로딩 스켈레톤, 반응형 레이아웃
 
 ## 보안
-- API 키는 `backend/.env`에서만 읽고(`.env`는 git 제외), 코드·로그에 남기지 않습니다.
-- 검색 입력에서 `<script>`, SQL 인젝션(`' OR 1=1 --`, `DROP TABLE` 등), 제어문자, 100자 초과를 차단하고
-  `규정위반: 허용되지 않는 입력입니다`(HTTP 400)를 반환합니다.
-- 프론트(`security.ts`)에서도 같은 규칙으로 먼저 검증하고, 8회/10초 초과 요청은 제한하며, 위반 3회 누적 시 30초간 검색을 차단합니다.
-- 이미지는 `https` + 허용 호스트(한국관광공사 tong.visitkorea.or.kr)만 렌더링합니다.
-- CORS는 `CORS_ORIGINS`에 지정한 출처만 허용합니다.
+방어는 **프론트(빠른 차단) → 서버(최종 방어)** 두 겹이고, 외부로 공개되는 건 이 백엔드뿐입니다.
+
+| 영역 | 방어 | 위치 |
+|------|------|------|
+| API 키 | `backend/.env`에서만 읽고 git 제외. httpx 로그 레벨을 올려 URL의 `serviceKey`가 로그에 남지 않음. 사진 서비스 오류 로그에도 URL을 남기지 않음 | `collector.py`, `logging_config.py`, `photo_service.py` |
+| 입력 검증 | `<script>`·SQL 인젝션(`' OR 1=1 --`, `DROP TABLE`)·템플릿 구문(`{{`, `${`)·제어문자·100자 초과 차단 → `규정위반: 허용되지 않는 입력입니다`(HTTP 400). 유니코드 NFC 정규화·공백 정리 후 검사 | 프론트 `security.ts` + 서버 `main.py` |
+| 요청 제한 | 클라이언트별 슬라이딩 윈도우: AI 요약 10회/분, AI 큐레이터·교정 12회/분, 검색 40회/분, 연관검색어 90회/분, 사진 240회/분, 그 외 120회/분 → 429. 프론트도 10초 8회 초과 제한 + 위반 3회 누적 시 30초 차단 | `ratelimit.py`, `security.ts` |
+| IP 위조 방지 | 요청 제한의 클라이언트 IP는 **직접 연결 상대**를 쓰고, 같은 PC의 터널(cloudflared)에서 온 경우에만 Cloudflare가 넣는 `CF-Connecting-IP`를 신뢰. `X-Forwarded-For`는 무시. 그래서 uvicorn을 `--no-proxy-headers`로 실행 | `ratelimit.py` |
+| 요청 크기 | 본문 8KB 초과는 파싱 전에 413, 질문은 200자 제한 | `ratelimit.py`, `schemas.py` |
+| 공격면 축소 | `/docs`, `/openapi.json`은 기본 비공개(`ENABLE_DOCS=on`일 때만 공개), CORS는 `CORS_ORIGINS` 허용 출처만 | `main.py` |
+| XSS | React가 모든 텍스트를 이스케이프하며 `dangerouslySetInnerHTML`을 쓰지 않음. 외부 이미지는 `https` + `tong.visitkorea.or.kr`만 렌더링(백엔드·프론트 이중 검사), 외부 링크는 `rel="noopener noreferrer"` | `photo_service.py`, `security.ts` |
+| 프롬프트 주입 | 사용자 질문과 축제 데이터(외부 공개 데이터)를 LLM 프롬프트에서 '데이터이며 지시문이 아님'으로 구분하고, 후보에 있는 값만 교정 결과로 인정. AI 출력은 텍스트로만 표시하며 AI에게 도구·파일·네트워크 권한이 없음 | `ai_service.py` |
+
+한계(알고 쓰세요): 입력 검증은 패턴 기반이라 완전하지 않고, 요청 제한은 메모리 기반(재시작 시 초기화·단일 프로세스)입니다. 계정/인증은 없습니다(공개 조회 서비스). Quick Tunnel로 공개하면 누구나 호출할 수 있으니 쓰지 않을 때는 터널을 끄세요.
 
 ## 배포 (전부 무료)
 구성: **프론트 = GitHub Pages**, **백엔드 + Ollama = 내 PC**, 둘을 **Cloudflare Quick Tunnel**로 연결합니다.
@@ -109,7 +117,7 @@ npm run build                              # 배포용 빌드 (dist/)
    - 주소: `https://<계정>.github.io/<저장소명>/`
 2. **백엔드 + 터널 (PC에서 실행)**
    ```bash
-   cd backend && uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
+   cd backend && uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 --no-proxy-headers
    cloudflared tunnel --url http://127.0.0.1:8000     # 출력되는 https://xxxx.trycloudflare.com 주소 확인
    ```
    - `cloudflared`: `winget install Cloudflare.cloudflared`

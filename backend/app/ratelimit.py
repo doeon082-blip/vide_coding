@@ -20,13 +20,17 @@ RULES: list[tuple[str, str | None, int, int]] = [
 DEFAULT_LIMIT = (120, 60)
 
 
+_LOOPBACK = {"127.0.0.1", "::1", "localhost"}
+MAX_BODY_BYTES = 8 * 1024
+
+
 def client_ip(request: Request) -> str:
-    # Cloudflare 터널 뒤에서는 실제 클라이언트 IP가 헤더로 전달된다.
-    return (
-        request.headers.get("cf-connecting-ip")
-        or (request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
-        or (request.client.host if request.client else "unknown")
-    )
+    """실제 연결 상대의 IP. 상대가 같은 PC의 터널(cloudflared)일 때만 Cloudflare가 넣어 주는
+    CF-Connecting-IP를 신뢰한다. 외부에서 직접 붙은 요청의 헤더(X-Forwarded-For 등)는 위조될 수 있어 무시한다."""
+    peer = request.client.host if request.client else "unknown"
+    if peer in _LOOPBACK:
+        return request.headers.get("cf-connecting-ip") or peer
+    return peer
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
@@ -48,6 +52,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         if not self.enabled or request.method == "OPTIONS" or request.url.path == "/api/health":
             return await call_next(request)
+
+        # 비정상적으로 큰 본문은 파싱 전에 차단 (이 API의 요청 본문은 짧은 질문뿐)
+        if request.method in {"POST", "PUT", "PATCH"} and int(request.headers.get("content-length") or 0) > MAX_BODY_BYTES:
+            return JSONResponse({"detail": "요청 본문이 너무 큽니다."}, status_code=413)
 
         now = time.monotonic()
         bucket, limit, window = self._rule(request)

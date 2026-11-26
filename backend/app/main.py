@@ -36,7 +36,14 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     yield
 
 
-app = FastAPI(title="Festival API", lifespan=lifespan)
+_docs = (os.getenv("ENABLE_DOCS") or "off").lower() == "on"
+app = FastAPI(
+    title="Festival API",
+    lifespan=lifespan,
+    docs_url="/docs" if _docs else None,
+    redoc_url=None,
+    openapi_url="/openapi.json" if _docs else None,
+)
 
 origins = [o.strip() for o in (os.getenv("CORS_ORIGINS") or "http://localhost:5173").split(",") if o.strip()]
 app.add_middleware(RateLimitMiddleware, enabled=(os.getenv("RATE_LIMIT", "on").lower() != "off"))
