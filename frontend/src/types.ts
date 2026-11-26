@@ -31,6 +31,7 @@ export interface Photo {
   url: string
   thumb: string
   caption: string
+  license: string
 }
 
 export interface PhotoResult {

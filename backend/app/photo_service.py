@@ -31,6 +31,7 @@ TOUR_API_URL = (os.getenv("TOUR_API_URL") or "https://apis.data.go.kr/B551011/Ko
 IMAGE_HOSTS = {"tong.visitkorea.or.kr"}
 CACHE_FILE = Path(os.getenv("PHOTO_CACHE_FILE") or BACKEND_DIR / "cache" / "photos.json")
 CACHE_TTL = 7 * 24 * 3600
+CACHE_VERSION = 2  # v2: Photo.license 추가
 MAX_PHOTOS = 6
 REGION_TYPES = {"12", "14", "15", "28"}  # 관광지, 문화시설, 행사, 레포츠 (숙박/음식점/쇼핑 제외)
 _PROVINCE_SUFFIX = ("특별시", "광역시", "특별자치시", "특별자치도", "도")
@@ -42,6 +43,8 @@ class Photo(BaseModel):
     url: str
     thumb: str
     caption: str = ""
+    # 공공누리 유형 (cpyrhtDivCd): Type1=출처표시, Type3=출처표시+변경금지. 모르면 빈 문자열
+    license: str = ""
 
 
 class PhotoResult(BaseModel):
@@ -135,7 +138,12 @@ def _item_photo(item: dict[str, Any]) -> Photo | None:
     url = _safe_url(item.get("firstimage"))
     if not url:
         return None
-    return Photo(url=url, thumb=_safe_url(item.get("firstimage2")) or url, caption=item.get("title", ""))
+    return Photo(
+        url=url,
+        thumb=_safe_url(item.get("firstimage2")) or url,
+        caption=item.get("title", ""),
+        license=item.get("cpyrhtDivCd") or "",
+    )
 
 
 def _detail_photos(client: httpx.Client, content_id: str, title: str) -> list[Photo]:
@@ -143,7 +151,14 @@ def _detail_photos(client: httpx.Client, content_id: str, title: str) -> list[Ph
     for im in _call(client, "detailImage2", contentId=content_id, imageYN="Y", numOfRows=MAX_PHOTOS, pageNo=1):
         url = _safe_url(im.get("originimgurl"))
         if url:
-            out.append(Photo(url=url, thumb=_safe_url(im.get("smallimageurl")) or url, caption=title))
+            out.append(
+                Photo(
+                    url=url,
+                    thumb=_safe_url(im.get("smallimageurl")) or url,
+                    caption=title,
+                    license=im.get("cpyrhtDivCd") or "",
+                )
+            )
     return out
 
 
@@ -158,6 +173,8 @@ def _lookup(record: FestivalRecord) -> PhotoResult:
                 if _similar(name, item.get("title", "")) < 0.6:
                     continue
                 photos = _detail_photos(client, item["contentid"], item["title"])
+                for ph in photos:
+                    ph.license = ph.license or item.get("cpyrhtDivCd") or ""
                 first = _item_photo(item)
                 if first and all(p.url != first.url for p in photos):
                     photos.insert(0, first)
@@ -180,7 +197,7 @@ def _lookup(record: FestivalRecord) -> PhotoResult:
 def get_photos(record: FestivalRecord) -> PhotoResult:
     with _lock:
         hit = _load_cache().get(record.id)
-    if hit and time.time() - hit["at"] < CACHE_TTL:
+    if hit and hit.get("v") == CACHE_VERSION and time.time() - hit["at"] < CACHE_TTL:
         return PhotoResult(**hit["data"])
     try:
         result = _lookup(record)
@@ -189,7 +206,7 @@ def get_photos(record: FestivalRecord) -> PhotoResult:
         logger.warning("TourAPI lookup failed id=%s: %s", record.id[:8], type(exc).__name__)
         return PhotoResult(kind="none", photos=[])
     with _lock:
-        _load_cache()[record.id] = {"at": time.time(), "data": result.model_dump()}
+        _load_cache()[record.id] = {"v": CACHE_VERSION, "at": time.time(), "data": result.model_dump()}
         _save_cache()
     logger.info("Photos id=%s kind=%s n=%d", record.id[:8], result.kind, len(result.photos))
     return result
