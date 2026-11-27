@@ -30,4 +30,7 @@ SCORE_HOURS_BEFORE = 3  # 점수 창: 시작 시각 3시간 전 ...
 SCORE_HOURS_AFTER = 3  # ... 3시간 후 (시작 시각 포함 7칸)
 PLACEBO_PERCENTILE = 95.0  # 위약 검정 문턱값
 PASS_RATIO = 0.5  # 통과 기준: 판정 가능한 행사일 중 절반 이상
+PASS_ZONES = ("park", "ring1")  # 이 중 하나라도 문턱값을 넘으면 그 행사는 통과
+JUDGE_START = "2025-09-01"  # 판정 대상 기간(양 끝 포함). 8월·12월은 기준값 재료로만 쓴다
+JUDGE_END = "2025-11-30"
 SUPPRESSED_FILL_VALUES = (0.0, 3.0)  # '*'(비식별)를 0과 3으로 각각 계산해 판정 비교
