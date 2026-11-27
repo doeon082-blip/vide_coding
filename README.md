@@ -39,7 +39,7 @@
 | F | 개발용 질문 20개로 검사 | 계획 |
 | G | 화면과 배포(Cloudflare Workers/D1) | 계획 |
 
-**아직 되지 않는 것(숨기지 않습니다):** 질문에 답하는 기능은 아직 없습니다(E단계). 오픈API 28종은 연결 전이고, 기상청·서울 도시데이터·특일 정보도 2단계 계획입니다. 핵심 함수 4개(`validate_sql`, `find_unsupported_numbers`, `to_jamo`, `edit_distance`)는 학습을 위해 직접 작성하는 중이라 본문이 비어 있습니다(해당 테스트는 건너뜀).
+**아직 되지 않는 것(숨기지 않습니다):** 질문에 답하는 기능은 아직 없습니다(E단계). 오픈API 28종은 연결 전이고, 기상청·서울 도시데이터·특일 정보도 2단계 계획입니다. 한글로 쓴 수("삼십 명")는 숫자 대조가 읽지 못해, 프롬프트로 아라비아 숫자만 쓰게 하고 답변 단계에서 따로 거릅니다.
 
 ## 구조
 
@@ -52,7 +52,7 @@ backend/app/chaesan/
 │   ├── correct.py               # 오타·줄임말 보정(약칭 → 자모 거리 → 확신도)
 │   ├── guard.py                 # 프롬프트 인젝션 방어, LLM 출력 검사
 │   ├── when.py                  # "지난달·7월·주말" 같은 기간 해석(과거 기준)
-│   └── sql_guard.py  answer.py  typo.py   # 핵심 함수 4개(직접 작성)
+│   └── sql_guard.py  answer.py  typo.py   # SQL 검사, 답 속 숫자 대조, 자모 풀기·편집 거리
 └── ingest/      # 로컬 전용: 원본 CSV → SQLite
     ├── specs.py convert.py load.py aggregate.py   # 적재
     ├── card_meta.py cards.py                      # 데이터 카드(58개: 적재 31 + 미연결 API 27)
