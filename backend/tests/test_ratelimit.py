@@ -51,3 +51,10 @@ def test_oversized_body_is_rejected_before_parsing():
     c = TestClient(app, client=("192.0.2.9", 4444))
     assert c.post("/api/echo", json={"q": "가" * 20_000}).status_code == 413
     assert c.post("/api/echo", json={"q": "ok"}).status_code == 200
+
+
+def test_non_numeric_content_length_is_400_not_500():
+    # 길이 헤더가 숫자가 아니면 int() 예외로 500이 나던 문제 (2026-11-28 수정)
+    c = TestClient(app, client=("192.0.2.9", 3333))
+    r = c.post("/api/echo", content=b"{}", headers={"content-length": "abc", "content-type": "application/json"})
+    assert r.status_code == 400

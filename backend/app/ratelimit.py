@@ -55,8 +55,13 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         # 비정상적으로 큰 본문은 파싱 전에 차단 (이 API의 요청 본문은 짧은 질문뿐)
-        if request.method in {"POST", "PUT", "PATCH"} and int(request.headers.get("content-length") or 0) > MAX_BODY_BYTES:
-            return JSONResponse({"detail": "요청 본문이 너무 큽니다."}, status_code=413)
+        if request.method in {"POST", "PUT", "PATCH"}:
+            try:
+                length = int(request.headers.get("content-length") or 0)
+            except ValueError:  # 숫자가 아닌 길이 헤더가 서버 오류(500)를 내지 않도록 400으로 막는다
+                return JSONResponse({"detail": "잘못된 요청입니다."}, status_code=400)
+            if length > MAX_BODY_BYTES:
+                return JSONResponse({"detail": "요청 본문이 너무 큽니다."}, status_code=413)
 
         now = time.monotonic()
         bucket, limit, window = self._rule(request)
