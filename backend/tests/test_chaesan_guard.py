@@ -69,7 +69,11 @@ def test_wrapped_data_cannot_close_block() -> None:
 
 def test_system_prompt_is_chaesan_and_unofficial() -> None:
     p = guard.build_system_prompt("계획 JSON 작성", "n1", "CANARY-x")
-    assert "채산" in p and "비공식" in p and "축제" not in p and "CANARY-x" in p
+    assert "채산" in p
+    assert "비공식" in p
+    assert "축제" not in p
+    assert "CANARY-x" in p
+    assert "아라비아 숫자" in p  # 한글 수 표기(삼십 명)는 숫자 대조가 읽지 못하므로 쓰지 못하게 한다
 
 
 def test_parse_guarded_json() -> None:

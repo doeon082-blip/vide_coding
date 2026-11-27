@@ -1,6 +1,6 @@
 """오타 보정 확신도 기준값 측정 (재현용).
 
-실행: `uv run python -m eval.calibrate_typo` (backend/ 에서). typo.to_jamo / typo.edit_distance(직접 작성)가 필요하다.
+실행: `uv run python -m eval.calibrate_typo` (backend/ 에서). typo.to_jamo / typo.edit_distance를 쓴다.
 
 무엇을 재나
 1. 합성 오타: 어휘 단어의 음절 하나의 초성·중성·종성을 바꿔(자모 1개 / 2개 차이) 만든 오타를 얼마나 맞게 고치는지.

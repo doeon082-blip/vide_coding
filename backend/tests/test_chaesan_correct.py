@@ -1,7 +1,7 @@
 """오타·줄임말 보정과 어휘 사전 테스트.
 
-판단 규칙(조사 처리, 임계값, 되묻기, 숫자 보호)은 '가짜 거리 함수'로 시험한다. 그래서 직접 작성하실 to_jamo·edit_distance가
-완성되기 전에도 이 파일의 대부분이 돌아가고, 두 함수가 완성되면 맨 아래의 실제 연결 테스트가 자동으로 켜진다.
+판단 규칙(조사 처리, 임계값, 되묻기, 숫자 보호)은 '가짜 거리 함수'로 시험해 계산 부분과 따로 확인하고,
+맨 아래에서 실제 to_jamo·edit_distance를 연결한 결과도 확인한다.
 """
 
 from __future__ import annotations
@@ -202,10 +202,7 @@ def test_hangul_words() -> None:
 
 
 def real() -> Corrector:
-    try:
-        return Corrector(load_vocab(ALIASES_FILE))
-    except NotImplementedError:
-        pytest.skip("to_jamo·edit_distance 사용자 작성 대기")
+    return Corrector(load_vocab(ALIASES_FILE))  # 기본값 = typo.py의 실제 to_jamo·edit_distance
 
 
 @pytest.mark.parametrize(
