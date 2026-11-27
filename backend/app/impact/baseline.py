@@ -149,6 +149,26 @@ def score_start(
     return compute_excess(series, baseline, start, hours_before, hours_after)
 
 
+def excess_profile(
+    series: Mapping[datetime, float],
+    start: datetime,
+    excluded_dates: Set[date],
+    hours_before: int = config.SCORE_HOURS_BEFORE,
+    hours_after: int = config.SCORE_HOURS_AFTER,
+) -> dict[int, float | None]:
+    """시작 시각 기준 offset(−3..+3)별 증가분. 시간대 그래프를 그리는 데 쓴다.
+
+    점수(합)와 달리 칸마다 따로 돌려주며, 기준값이나 실제값이 없는 칸은 None이다.
+    """
+    t0 = _floor_hour(start)
+    out: dict[int, float | None] = {}
+    for k in range(-hours_before, hours_after + 1):
+        t = t0 + timedelta(hours=k)
+        b, a = baseline_at(series, t, excluded_dates), series.get(t)
+        out[k] = float(a) - b if b is not None and _valid(a) else None  # type: ignore[arg-type]
+    return out
+
+
 def placebo_scores(
     series: Mapping[datetime, float],
     candidate_days: Iterable[date],
