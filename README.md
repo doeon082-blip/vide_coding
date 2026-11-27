@@ -34,7 +34,7 @@
 | A | 조사(저장소·재사용 모듈·모델 확인) | 완료 |
 | B | 파일 30종 SQLite 적재, 입출차 시간대 집계 표 | 완료 |
 | C | 데이터 카드(실제 기간·주의점·등급)와 주제 묶음 | 완료(검토 대기) |
-| D | 문서 색인(FTS5)과 오타·줄임말 보정 | 계획 |
+| D | 문서 색인(FTS5)과 오타·줄임말 보정 | 완료(검토 대기) |
 | E | 답변 엔진(계획 → 검사·실행 → 설명 → 숫자 대조) | 계획 |
 | F | 개발용 질문 20개로 검사 | 계획 |
 | G | 화면과 배포(Cloudflare Workers/D1) | 계획 |
@@ -48,12 +48,15 @@ backend/app/chaesan/
 ├── core/        # 로컬·서비스 공통. 표준 라이브러리만 사용(Cloudflare Python Workers에서 그대로 돌아야 함)
 │   ├── config.py   ports.py     # 설정값, db·llm·clock 어댑터 인터페이스
 │   ├── catalog.py               # 데이터 카드 읽기·검증
+│   ├── search.py                # 문서 키워드 검색(FTS5 + LIKE + 등급 가중치)
+│   ├── correct.py               # 오타·줄임말 보정(약칭 → 자모 거리 → 확신도)
 │   ├── guard.py                 # 프롬프트 인젝션 방어, LLM 출력 검사
 │   ├── when.py                  # "지난달·7월·주말" 같은 기간 해석(과거 기준)
 │   └── sql_guard.py  answer.py  typo.py   # 핵심 함수 4개(직접 작성)
 └── ingest/      # 로컬 전용: 원본 CSV → SQLite
     ├── specs.py convert.py load.py aggregate.py   # 적재
-    └── card_meta.py cards.py                      # 데이터 카드(58개: 적재 31 + 미연결 API 27)
+    ├── card_meta.py cards.py                      # 데이터 카드(58개: 적재 31 + 미연결 API 27)
+    └── docs.py aliases.py                         # 문서 색인(3,635건), 오타 보정용 어휘 사전
 backend/data/    # 원본·DB는 git에 올리지 않음(gitignore)
 ```
 
@@ -65,8 +68,11 @@ backend/data/    # 원본·DB는 git에 올리지 않음(gitignore)
 cd backend
 uv sync
 uv run python -m app.chaesan.ingest.load     # data/chaesan.sqlite 생성(약 2초). 파일 형식이 명세와 다르면 멈춘다
+uv run python -m app.chaesan.ingest.docs     # 문서 색인(docs, docs_fts)
+uv run python -m app.chaesan.ingest.aliases  # 오타 보정용 사전 app/chaesan/aliases.json
 uv run python -m app.chaesan.ingest.cards    # data/cards/*.json 생성(DB에서 기간·행 수를 직접 계산)
-uv run pytest                                # 전체 테스트
+uv run pytest                                # 전체 테스트(린트·타입 검사 포함)
+uv run ruff check && uv run mypy             # 코드 양식·타입 검사(채산 코드만)
 ```
 
 ## 안전 원칙
