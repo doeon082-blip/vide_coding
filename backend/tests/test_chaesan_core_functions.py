@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 import pytest
 
@@ -75,7 +76,7 @@ def test_validate_sql_rejects(sql: str) -> None:
 
 
 @pytest.mark.parametrize(
-    "answer, rows, expected",
+    ("answer", "rows", "expected"),
     [
         ("입출차는 215,528건이에요.", [{"n": 215528}], []),
         ("비율은 3.5%예요.", [{"r": 3.5}], []),
@@ -95,7 +96,7 @@ def test_find_unsupported_numbers(answer: str, rows: list[dict[str, Any]], expec
 
 
 @pytest.mark.parametrize(
-    "text, expected",
+    ("text", "expected"),
     [("가", "ㄱㅏ"), ("한", "ㅎㅏㄴ"), ("수영장", "ㅅㅜㅇㅕㅇㅈㅏㅇ"), ("닭", "ㄷㅏㄺ"), ("a1 ", "a1 "), ("", "")],
 )
 def test_to_jamo(text: str, expected: str) -> None:
@@ -103,7 +104,7 @@ def test_to_jamo(text: str, expected: str) -> None:
 
 
 @pytest.mark.parametrize(
-    "a, b, d",
+    ("a", "b", "d"),
     [("", "", 0), ("abc", "abc", 0), ("", "abc", 3), ("kitten", "sitting", 3), ("수영징", "수영장", 1)],
 )
 def test_edit_distance(a: str, b: str, d: int) -> None:

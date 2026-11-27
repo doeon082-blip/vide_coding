@@ -19,8 +19,46 @@ from app.chaesan.core.when import parse_when
 RNG_SEED = 20261128
 ITERATIONS = 3000
 
-_SPECIAL = ["\x00", "​", "﻿", "‮", "＜ｓｃｒｉｐｔ＞", "<|im_start|>", "```", "<<<", ">>>", "\n\n\n", "\t", "　", "'; DROP TABLE x;--", "\\", "%", "😀", "ㅋㅋ", "ㅎ"]
-_WORDS = ["올림픽공원", "테니스장", "수영장", "주차", "이용자", "몇 월", "가장", "많았어", "언제", "알려줘", "ignore", "previous", "시스템 프롬프트", "무시", "만 출력", "SELECT", "FROM", "UNION"]
+_SPECIAL = [
+    "\x00",
+    "​",
+    "﻿",
+    "‮",
+    "＜ｓｃｒｉｐｔ＞",
+    "<|im_start|>",
+    "```",
+    "<<<",
+    ">>>",
+    "\n\n\n",
+    "\t",
+    "　",
+    "'; DROP TABLE x;--",
+    "\\",
+    "%",
+    "😀",
+    "ㅋㅋ",
+    "ㅎ",
+]
+_WORDS = [
+    "올림픽공원",
+    "테니스장",
+    "수영장",
+    "주차",
+    "이용자",
+    "몇 월",
+    "가장",
+    "많았어",
+    "언제",
+    "알려줘",
+    "ignore",
+    "previous",
+    "시스템 프롬프트",
+    "무시",
+    "만 출력",
+    "SELECT",
+    "FROM",
+    "UNION",
+]
 
 
 def _random_text(rng: random.Random) -> str:
@@ -36,7 +74,13 @@ def _random_text(rng: random.Random) -> str:
         elif kind < 0.85:
             parts.append("".join(rng.choice(string.printable) for _ in range(rng.randint(1, 10))))
         else:
-            parts.append("".join(chr(rng.randint(0x20, 0xFFFF)) for _ in range(rng.randint(1, 6)) if not 0xD800 <= rng.randint(0, 0xFFFF) <= 0xDFFF))
+            parts.append(
+                "".join(
+                    chr(rng.randint(0x20, 0xFFFF))
+                    for _ in range(rng.randint(1, 6))
+                    if not 0xD800 <= rng.randint(0, 0xFFFF) <= 0xDFFF
+                )
+            )
     return rng.choice(["", " ", "\n"]).join(parts)
 
 
@@ -83,11 +127,17 @@ def test_parse_guarded_json_only_dict_or_rejected() -> None:
 _WHEN_TOKENS = [
     "7월", "13월", "0월", "00월", "1월", "12월", "2월 30일", "2월 29일", "31일", "0일", "32일", "4월 31일", "12월 31일",
     "작년", "올해", "지난달", "이번 달", "지난주", "이번 주", "이번 주말", "주말", "평일", "월요일", "일요일", "내일", "모레",
-    "오늘", "요즘", "최근", "2024년", "1999년", "2099년", "0000년", "9999년", "1800년", "2024년 7월", "2024년 13월", "일", "월", "요일",
+    "오늘", "요즘", "최근", "2024년", "1999년", "2099년", "0000년", "9999년", "1800년",
+    "2024년 7월", "2024년 13월", "일", "월", "요일",
     "테니스장", "이용자", "몇", "?", "  ", "\n",
 ]  # fmt: skip
 _TODAYS = [date(2026, 11, 28), date(2026, 1, 1), date(2026, 12, 31), date(2024, 2, 29), date(2026, 3, 1), date(2027, 1, 3)]
-_RANGES = [None, (date(2024, 7, 1), date(2024, 7, 31)), (date(2021, 1, 1), date(2025, 12, 31)), (date(2026, 6, 1), date(2026, 6, 1))]
+_RANGES = [
+    None,
+    (date(2024, 7, 1), date(2024, 7, 31)),
+    (date(2021, 1, 1), date(2025, 12, 31)),
+    (date(2026, 6, 1), date(2026, 6, 1)),
+]
 
 
 def test_parse_when_never_raises_and_results_are_consistent() -> None:

@@ -132,11 +132,11 @@ def load_file(con: sqlite3.Connection, spec: FileSpec, path: Path) -> dict[str, 
     names = ["_row", *(out[0] for _, _, out in plan), *(f"{plan[i][2][0]}_raw" for i in raw_cols)]
     types = ["INTEGER PRIMARY KEY", *(out[1] for _, _, out in plan), *("TEXT" for _ in raw_cols)]
     con.execute(f"DROP TABLE IF EXISTS {_q(spec.table)}")
-    con.execute(f"CREATE TABLE {_q(spec.table)} ({', '.join(f'{_q(n)} {t}' for n, t in zip(names, types))})")
+    con.execute(f"CREATE TABLE {_q(spec.table)} ({', '.join(f'{_q(n)} {t}' for n, t in zip(names, types, strict=True))})")
     marks = ", ".join("?" * len(names))
     con.executemany(
         f"INSERT INTO {_q(spec.table)} VALUES ({marks})",
-        ([n, *vals, *(rws[i] for i in raw_cols)] for n, (vals, rws) in enumerate(zip(values, raws), start=1)),
+        ([n, *vals, *(rws[i] for i in raw_cols)] for n, (vals, rws) in enumerate(zip(values, raws, strict=True), start=1)),
     )
     con.execute(
         "INSERT INTO meta_load VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
@@ -173,9 +173,7 @@ def iter_inputs(raw_dir: Path, specs: Sequence[FileSpec]) -> Iterator[tuple[File
         yield spec, raw_dir / f"{spec.id}.csv"
 
 
-def build(
-    raw_dir: Path = RAW_DIR, out_path: Path = DB_PATH, specs: Sequence[FileSpec] = SPECS
-) -> dict[str, dict[str, int]]:
+def build(raw_dir: Path = RAW_DIR, out_path: Path = DB_PATH, specs: Sequence[FileSpec] = SPECS) -> dict[str, dict[str, int]]:
     """적재. 반환: 표별 원래 값 보존 수(보고용). specs는 테스트에서 일부만 적재할 때 바꾼다."""
     tmp = out_path.with_suffix(".tmp")
     tmp.unlink(missing_ok=True)

@@ -121,9 +121,7 @@ def load_catalog(cards_dir: Path) -> Catalog:
             raise CatalogError(f"파일 이름 {path.name}과 카드 번호 {card.id}가 다르다")
         cards[card.id] = card
     raw_groups = json.loads((cards_dir / "_groups.json").read_text(encoding="utf-8"))
-    groups = {
-        gid: Group(gid, g["title"], g["representative"], g["rule"], tuple(g["members"])) for gid, g in raw_groups.items()
-    }
+    groups = {gid: Group(gid, g["title"], g["representative"], g["rule"], tuple(g["members"])) for gid, g in raw_groups.items()}
     for g in groups.values():
         unknown = [m for m in g.members if m not in cards]
         if unknown or g.representative not in g.members:

@@ -25,8 +25,8 @@ def _core_files() -> list[Path]:
 
 def test_structure() -> None:
     assert (BACKEND / "app" / "chaesan" / "__init__.py").is_file()
-    assert EXPECTED_CORE <= {p.name for p in _core_files()}
-    assert EXPECTED_INGEST <= {p.name for p in (BACKEND / "app" / "chaesan" / "ingest").glob("*.py")}
+    assert {p.name for p in _core_files()} >= EXPECTED_CORE
+    assert {p.name for p in (BACKEND / "app" / "chaesan" / "ingest").glob("*.py")} >= EXPECTED_INGEST
 
 
 @pytest.mark.parametrize("path", _core_files(), ids=lambda p: p.name)

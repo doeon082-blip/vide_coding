@@ -140,9 +140,7 @@ def _no_matching_day(start: date, end: date, weekdays: frozenset[int]) -> bool:
     return span < 7 and not any((start + timedelta(days=i)).weekday() in weekdays for i in range(span))
 
 
-def parse_when(
-    msg: str, today: date, data_range: tuple[date, date] | None = None, prefer: Prefer = "past"
-) -> When | None:
+def parse_when(msg: str, today: date, data_range: tuple[date, date] | None = None, prefer: Prefer = "past") -> When | None:
     """질문에서 기간과 요일 조건을 읽는다. 아무 표현도 없으면 None.
     today는 반드시 KST 날짜(ports.Clock)를 넘긴다. data_range는 그 질문이 쓸 데이터 카드의 실제 기간.
     prefer는 연도 없는 날짜의 방향(위 Prefer 설명)."""

@@ -79,7 +79,8 @@ def _period(con: sqlite3.Connection, table: str, meta: Meta) -> dict[str, Any] |
 def _columns(con: sqlite3.Connection, table: str, meta: Meta) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for name, ko, kind, sql_type, nulls, raws in con.execute(
-        "SELECT column_name, ko_name, kind, sql_type, null_count, raw_count FROM meta_columns WHERE table_name=? ORDER BY position",
+        "SELECT column_name, ko_name, kind, sql_type, null_count, raw_count "
+        "FROM meta_columns WHERE table_name=? ORDER BY position",
         (table,),
     ):
         out.append(
@@ -185,7 +186,8 @@ def api_cards(con: sqlite3.Connection) -> list[dict[str, Any]]:
     이름과 링크만 개방목록에서 가져오고, 목록에 없는 설명·기간·행 수는 지어내지 않는다(null = 미확인)."""
     cards: list[dict[str, Any]] = []
     rows = con.execute(
-        "SELECT _row, dataset_name, url, description FROM t_15147873 WHERE url LIKE '%openapi.do' OR url LIKE '%monthlyApi.do' ORDER BY _row"
+        "SELECT _row, dataset_name, url, description FROM t_15147873 "
+        "WHERE url LIKE '%openapi.do' OR url LIKE '%monthlyApi.do' ORDER BY _row"
     ).fetchall()
     for row_no, name, url, desc in rows:
         short = name.removeprefix(NAME_PREFIX)
@@ -199,7 +201,10 @@ def api_cards(con: sqlite3.Connection) -> list[dict[str, Any]]:
                 "aggregate_tables": [], "in_service": False, "group": group, "tier": tier, "weight": TIER_WEIGHTS[tier],
                 "tier_reason": "이름만 보고 기준표로 정함(내용 미확인)", "source_kind": None, "body_available": None,
                 "summary": desc, "rows": None, "period": None, "last_data_date": None, "columns": [],
-                "caveats": ["아직 연결하지 않은 오픈API다. 질문이 이 데이터를 가리키면 '아직 연결 안 됨'으로 답하고 개방 수요가 아니라 '연결 예정'으로 기록한다."],
+                "caveats": [
+                    "아직 연결하지 않은 오픈API다. 질문이 이 데이터를 가리키면 '아직 연결 안 됨'으로 답하고 "
+                    "개방 수요가 아니라 '연결 예정'으로 기록한다."
+                ],
                 "example_questions": [], "aliases": [], "load": None,
             }
         )  # fmt: skip
@@ -215,7 +220,9 @@ def api_cards(con: sqlite3.Connection) -> list[dict[str, Any]]:
 def build_cards(db_path: Path = DB_PATH, history_html: Path = HISTORY_HTML) -> list[dict[str, Any]]:
     spec_ids = {s.id for s in SPECS}
     if spec_ids != set(META):
-        raise CardError(f"명세와 카드 메타가 다르다: 메타에만 {sorted(set(META) - spec_ids)}, 명세에만 {sorted(spec_ids - set(META))}")
+        raise CardError(
+            f"명세와 카드 메타가 다르다: 메타에만 {sorted(set(META) - spec_ids)}, 명세에만 {sorted(spec_ids - set(META))}"
+        )
     con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)  # 읽기 전용
     try:
         cards = [file_card(con, s, META[s.id]) for s in SPECS]

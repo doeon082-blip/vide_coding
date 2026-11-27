@@ -13,7 +13,7 @@ PARKING_RANGE = (date(2024, 7, 1), date(2024, 7, 31))  # 입출차 파일처럼 
 
 
 @pytest.mark.parametrize(
-    "msg, start, end",
+    ("msg", "start", "end"),
     [
         ("7월에 몇 대였어?", date(2026, 7, 1), date(2026, 7, 31)),  # 축제 앱은 2027년 7월로 읽었다
         ("12월 이용자", date(2025, 12, 1), date(2025, 12, 31)),  # 아직 안 온 달은 작년
@@ -58,7 +58,7 @@ def test_no_period(msg: str) -> None:
 
 
 @pytest.mark.parametrize(
-    "msg, start, end",
+    ("msg", "start", "end"),
     [
         ("10월 1일 행사", date(2026, 10, 1), date(2026, 10, 1)),  # 점검 전에는 10월 전체로 읽었다
         ("2024년 7월 15일", date(2024, 7, 15), date(2024, 7, 15)),

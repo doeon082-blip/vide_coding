@@ -16,7 +16,7 @@ from app.chaesan.ingest import cards as cards_mod
 from app.chaesan.ingest.card_meta import GROUPS, META
 from app.chaesan.ingest.cards import CardError, HistoryEntry, build_cards, parse_history, write_cards
 from app.chaesan.ingest.load import RAW_DIR, build
-from app.chaesan.ingest.specs import SPEC_BY_ID, SPECS
+from app.chaesan.ingest.specs import SPECS
 
 HISTORY = cards_mod.HISTORY_HTML
 HAVE_DATA = all((RAW_DIR / f"{s.id}.csv").is_file() for s in SPECS) and HISTORY.is_file()
@@ -69,7 +69,9 @@ def test_tiers_follow_the_criteria_table(cards: dict[str, dict[str, Any]]) -> No
     """C는 근무복 2종뿐(지시서 기준표). 등급은 개발 점수가 아니라 기준과 이유로 정한다."""
     assert {i for i, c in cards.items() if c["tier"] == "C"} == {"15168248", "15168288"}
     assert all(c["tier_reason"].strip() for c in cards.values())
-    assert {"15089962", "15138735", "15133891", "15101610", "15143220", "15137825"} <= {i for i, c in cards.items() if c["tier"] == "A"}
+    assert {"15089962", "15138735", "15133891", "15101610", "15143220", "15137825"} <= {
+        i for i, c in cards.items() if c["tier"] == "A"
+    }
 
 
 @needs_data
@@ -113,7 +115,7 @@ def test_rows_match_raw_csv(cards: dict[str, dict[str, Any]], spec: Any) -> None
 
 @needs_data
 @pytest.mark.parametrize(
-    "card_id, col, end_col",
+    ("card_id", "col", "end_col"),
     [
         ("15089962", "등록일", None),
         ("15133891", "시작일", "종료일"),
@@ -147,7 +149,7 @@ def test_monthly_parking_period_and_history(cards: dict[str, dict[str, Any]]) ->
 
 @needs_data
 @pytest.mark.parametrize(
-    "sql, expected",
+    ("sql", "expected"),
     [
         # 15101610: 시작월과 기간 시작이 다른 행 47건, 운영 중 표시 281건, 강좌번호 680개
         ("SELECT COUNT(*) FROM t_15101610 WHERE start_month IS NOT period_start", 47),
@@ -190,7 +192,9 @@ def test_numbers_cited_in_caveats(db_path: Path, sql: str, expected: float) -> N
 def test_unlinked_facts_in_caveats(db_path: Path) -> None:
     """숫자가 아닌 주장도 데이터로 확인한다."""
     assert dict(_q(db_path, "SELECT open_label, COUNT(*) FROM t_15143220 GROUP BY 1")) == {"개방시간": 7, "출입금지기간": 1}
-    assert _q(db_path, "SELECT place, open_detail FROM t_15143220 WHERE open_label='출입금지기간'") == [("잔디통제시기", "11-01 ~ 익년05-31")]
+    assert _q(db_path, "SELECT place, open_detail FROM t_15143220 WHERE open_label='출입금지기간'") == [
+        ("잔디통제시기", "11-01 ~ 익년05-31")
+    ]
     assert _q(db_path, "SELECT COUNT(*) FROM t_15143220 WHERE place='나홀로나무'") == [(2,)]
     assert _q(db_path, "SELECT MAX(reg_date) FROM t_15090719") == [("2015-01-10",)]
     assert _q(db_path, "SELECT MAX(reg_date) FROM t_15119388") == [("2022-06-29",)]
@@ -200,10 +204,15 @@ def test_unlinked_facts_in_caveats(db_path: Path) -> None:
     assert users["일일입장"] > 30 * users["월회원"]
     # 센터별 마지막 등록일(문장에 적은 날짜)
     last = dict(_q(db_path, "SELECT center, MAX(reg_date) FROM t_15098997 GROUP BY 1"))
-    assert last == {"올림픽수영장": "2026-06-17", "올림픽스포츠센터": "2026-03-17", "일산스포츠센터": "2025-02-24", "분당스포츠센터": "2024-09-30"}
+    assert last == {
+        "올림픽수영장": "2026-06-17",
+        "올림픽스포츠센터": "2026-03-17",
+        "일산스포츠센터": "2025-02-24",
+        "분당스포츠센터": "2024-09-30",
+    }
 
 
-# --------------------------------------------------------------------------- 별칭 규칙: 데이터 이름·값·열 이름·개방목록 키워드에서만
+# ------------------------------------------------------- 별칭 규칙: 데이터 이름·값·열 이름·개방목록 키워드에서만
 
 
 def _norm(s: str) -> str:
@@ -214,9 +223,7 @@ def _norm(s: str) -> str:
 def test_aliases_come_from_data_only(db_path: Path, cards: dict[str, dict[str, Any]]) -> None:
     con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
     try:
-        listing = " ".join(
-            _norm(f"{n} {k or ''}") for n, k in con.execute("SELECT dataset_name, keywords FROM t_15147873")
-        )
+        listing = " ".join(_norm(f"{n} {k or ''}") for n, k in con.execute("SELECT dataset_name, keywords FROM t_15147873"))
         bad: list[str] = []
         for cid, c in cards.items():
             for alias in c["aliases"]:
@@ -292,7 +299,7 @@ def _valid_card() -> dict[str, Any]:
 
 
 @pytest.mark.parametrize(
-    "mutate, message",
+    ("mutate", "message"),
     [
         (lambda c: c.update(weight=0.5), "가중치"),
         (lambda c: c.update(tier="Z"), "가중치"),
@@ -325,7 +332,12 @@ def test_catalog_rejects_orphan_and_mismatched_file(tmp_path: Path) -> None:
 @needs_data
 def test_write_never_deletes_non_card_json(cards: dict[str, dict[str, Any]], tmp_path: Path) -> None:
     """--out을 잘못 지정해도 카드가 아닌 JSON은 남아 있어야 한다."""
-    other = {"settings.json": '{"a": 1}', "list.json": "[1, 2]", "broken.json": "{", "x.json": '{"id": "y", "kind": "file", "tier": "A"}'}
+    other = {
+        "settings.json": '{"a": 1}',
+        "list.json": "[1, 2]",
+        "broken.json": "{",
+        "x.json": '{"id": "y", "kind": "file", "tier": "A"}',
+    }
     for name, body in other.items():
         (tmp_path / name).write_text(body, encoding="utf-8")
     stale = {"id": "77777777", "kind": "file", "tier": "A"}

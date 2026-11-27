@@ -16,7 +16,7 @@ from app.chaesan.ingest.specs import SPEC_BY_ID, SPECS, FileSpec
 
 
 @pytest.mark.parametrize(
-    "fn, raw, expected",
+    ("fn", "raw", "expected"),
     [
         (convert.iso_date, "2024-07-01", ("2024-07-01", None)),
         (convert.iso_date, "1990-01-01", (None, "1990-01-01")),  # 기본값 = 날짜 없음, 원래 값은 남긴다
@@ -41,7 +41,10 @@ def test_converters(fn: convert.Converter, raw: str, expected: convert.Converted
 
 def test_ranges() -> None:
     assert convert.split_date_range("2026-01-01~9999-12-31") == (("2026-01-01", None), ("9999-12-31", None))
-    assert convert.split_date_range("1990-01-01 00:00:00~2025-06-01 00:00:00") == ((None, "1990-01-01 00:00:00"), ("2025-06-01", None))
+    assert convert.split_date_range("1990-01-01 00:00:00~2025-06-01 00:00:00") == (
+        (None, "1990-01-01 00:00:00"),
+        ("2025-06-01", None),
+    )
     assert convert.split_time_range("9:00-9:50") == (("09:00", None), ("09:50", None))
     assert convert.split_time_range("종일") == ((None, "종일"), (None, "종일"))
 
@@ -68,8 +71,18 @@ def _write(d: Path, spec: FileSpec, lines: list[str], enc: str = "cp949") -> Non
 def raw(tmp_path: Path) -> Path:
     d = tmp_path / "raw"
     d.mkdir()
-    _write(d, TENNIS, ["순번,구분,시작일,종료일,이용자수", "1,월회원,2023-01-01,2023-01-31,469", "2,일반,1990-01-01,2023-01-31,1200"])
-    _write(d, PARKING, ["입차일,입차일시,출차일시", "2024-07-01,2024-07-01 08:10,2024-07-01 09:00", "2024-07-01,2024-07-01 08:30,2024-07-02 00:10"])
+    _write(
+        d, TENNIS, ["순번,구분,시작일,종료일,이용자수", "1,월회원,2023-01-01,2023-01-31,469", "2,일반,1990-01-01,2023-01-31,1200"]
+    )
+    _write(
+        d,
+        PARKING,
+        [
+            "입차일,입차일시,출차일시",
+            "2024-07-01,2024-07-01 08:10,2024-07-01 09:00",
+            "2024-07-01,2024-07-01 08:30,2024-07-02 00:10",
+        ],
+    )
     return d
 
 
