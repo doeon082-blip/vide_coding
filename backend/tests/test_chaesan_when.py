@@ -81,3 +81,27 @@ def test_this_weekend_has_dates_and_condition() -> None:
 def test_month_day_does_not_eat_sunday() -> None:
     w = parse_when("7월 일요일", TODAY)
     assert w is not None and (w.start, w.end) == (date(2026, 7, 1), date(2026, 7, 31)) and w.weekdays == frozenset({6})
+
+
+def test_news_questions_read_forward() -> None:
+    # 소식 갈래: 아직 안 온 12월 25일은 올해, 지난 7월은 내년 (과거 기준이면 2025-12-25가 됐다)
+    w = parse_when("12월 25일 행사 있어?", TODAY, prefer="future")
+    assert w is not None and w.start == date(2026, 12, 25) and w.future
+    w = parse_when("7월 행사", TODAY, prefer="future")
+    assert w is not None and w.start == date(2027, 7, 1)
+    w = parse_when("11월 행사", TODAY, prefer="future")  # 이번 달은 올해
+    assert w is not None and w.start == date(2026, 11, 1)
+
+
+def test_data_range_wins_over_prefer() -> None:
+    w = parse_when("7월", TODAY, PARKING_RANGE, prefer="future")
+    assert w is not None and w.start == date(2024, 7, 1)
+
+
+def test_date_weekday_conflict_is_flagged() -> None:
+    w = parse_when("7월 1일 일요일", TODAY)  # 2026-07-01은 수요일
+    assert w is not None and w.conflict
+    w = parse_when("7월 5일 일요일", TODAY)  # 2026-07-05는 일요일
+    assert w is not None and not w.conflict
+    w = parse_when("7월 주말", TODAY)  # 한 달에는 주말이 있다
+    assert w is not None and not w.conflict
