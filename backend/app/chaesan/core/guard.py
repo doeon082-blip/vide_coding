@@ -165,9 +165,13 @@ class InjectionBlocked(ValueError):
 def check_user_input(text: str, max_len: int = MAX_QUESTION_LEN) -> str:
     """질문 검증. 통과하면 정제된 문자열, 아니면 InjectionBlocked."""
     norm = normalize_text(text)
+    # 길이·빈 입력부터 막는다: 긴 입력에 탐지 정규식 수십 개를 돌리는 것은 CPU 낭비이고 공격에 쓰일 수 있다
+    if not norm or len(norm) > max_len:
+        log_event("user_input_blocked", text[:max_len], ["too_long"] if norm else ["empty"])
+        raise InjectionBlocked(BLOCK_MESSAGE)
     det = detect(text)  # 정제 전 원문 기준으로 검사 (구조 토큰 자체가 신호)
-    if not norm or det.flagged or len(norm) > max_len:
-        log_event("user_input_blocked", text, det.blocking or (["too_long"] if norm else ["empty"]))
+    if det.flagged:
+        log_event("user_input_blocked", text, det.blocking)
         raise InjectionBlocked(BLOCK_MESSAGE)
     if det.hits:
         log_event("user_input_noted", text, det.hits)
