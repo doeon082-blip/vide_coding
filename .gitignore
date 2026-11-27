@@ -39,3 +39,6 @@ Thumbs.db
 
 # 사진 캐시
 cache/
+
+# 채산/행사 분석: 원본 데이터와 DB (재배포 금지 자료 포함)
+backend/data/
