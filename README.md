@@ -1,9 +1,96 @@
-# 🎉 전국 축제 정보 & 로컬 AI 큐레이션
+# 채산 · 한체산 데이터 길라잡이 (+ 축제 앱)
+
+이 저장소에는 두 가지가 있습니다.
+
+| 이름 | 무엇 | 위치 |
+|------|------|------|
+| **채산** (이번 작업) | 한국체육산업개발(한체산)의 개방 공공데이터와 공개 기록을 근거로, 시민의 질문에 **출처와 함께** 답하는 AI 안내 서비스(**비공식**) | `backend/app/chaesan/` |
+| 축제 앱 (기존) | 전국 축제 정보 + 로컬 AI 큐레이션 | `backend/app/*.py`, `frontend/` — 아래 [축제 앱](#-전국-축제-정보--로컬-ai-큐레이션) |
+
+> "채산"은 참가자가 붙인 가칭이며 기관의 공식 서비스가 아닙니다. 공모전: 2026 KSPO&Co 공공데이터 활용 경진대회.
+
+## 채산이 하는 일
+
+시민이 "테니스장은 몇 월에 붐벼?", "올림픽공원은 언제부터 이 회사가 관리했어?"처럼 말로 물으면, 한체산 개방 데이터와 공개 기록에서 근거를 찾아 답합니다. 데이터가 오래됐더라도 "언제 자료인지"를 답에 함께 보여 주는 **데이터 길라잡이**입니다.
+
+- **숫자·날짜·판정은 코드가 계산**하고, LLM은 질문 해석·자료 선택·설명만 맡습니다.
+- 모든 답에 **데이터 이름·번호·실제 기간·주의점**을 붙입니다. 근거가 없으면 추측하지 않고 "모른다"고 답합니다.
+- 답하지 못한 질문은 **주제 요약만** 기록해 기관의 추가 개방 검토 자료로 씁니다(질문 원문은 저장하지 않음).
+
+질문은 다섯 갈래입니다.
+
+| 갈래 | 질문 예 | 근거 | 답하는 방식 |
+|------|---------|------|-------------|
+| 역사 | 올림픽공원 장미축제는 언제부터 기사가 났어? | 보도자료, 언론보도현황, 기관 연혁 | 문서 검색 후 인용 |
+| 시설·이용 | 잔디마당은 언제 개방해? | 자주 묻는 질문, 잔디시설정보 | 문서 검색 후 인용 |
+| 소식 | 요즘 공원에 무슨 행사가 있어? | 올팍소식, 핫뉴스, 보도자료 | 날짜순 검색 |
+| 기관 정보 | 이 기관은 어떤 사업을 공개하고 있어? | 사전정보공표, 사업실명제, 정보목록 | 목록 검색 후 링크 안내 |
+| 데이터 | 테니스장은 몇 월에 이용자가 가장 많았어? | 파일데이터 30종 | 코드가 계산 |
+
+## 진행 상황
+
+| 단계 | 내용 | 상태 |
+|------|------|------|
+| A | 조사(저장소·재사용 모듈·모델 확인) | 완료 |
+| B | 파일 30종 SQLite 적재, 입출차 시간대 집계 표 | 완료 |
+| C | 데이터 카드(실제 기간·주의점·등급)와 주제 묶음 | 진행 중 |
+| D | 문서 색인(FTS5)과 오타·줄임말 보정 | 계획 |
+| E | 답변 엔진(계획 → 검사·실행 → 설명 → 숫자 대조) | 계획 |
+| F | 개발용 질문 20개로 검사 | 계획 |
+| G | 화면과 배포(Cloudflare Workers/D1) | 계획 |
+
+**아직 되지 않는 것(숨기지 않습니다):** 질문에 답하는 기능은 아직 없습니다(E단계). 오픈API 28종은 연결 전이고, 기상청·서울 도시데이터·특일 정보도 2단계 계획입니다. 핵심 함수 4개(`validate_sql`, `find_unsupported_numbers`, `to_jamo`, `edit_distance`)는 학습을 위해 직접 작성하는 중이라 본문이 비어 있습니다(해당 테스트는 건너뜀).
+
+## 구조
+
+```
+backend/app/chaesan/
+├── core/        # 로컬·서비스 공통. 표준 라이브러리만 사용(Cloudflare Python Workers에서 그대로 돌아야 함)
+│   ├── config.py   ports.py     # 설정값, db·llm·clock 어댑터 인터페이스
+│   ├── guard.py                 # 프롬프트 인젝션 방어, LLM 출력 검사
+│   ├── when.py                  # "지난달·7월·주말" 같은 기간 해석(과거 기준)
+│   └── sql_guard.py  answer.py  typo.py   # 핵심 함수 4개(직접 작성)
+└── ingest/      # 로컬 전용: 원본 CSV → SQLite
+    ├── specs.py convert.py load.py aggregate.py
+backend/data/    # 원본·DB는 git에 올리지 않음(gitignore)
+```
+
+## 실행
+
+원본 데이터(`backend/data/raw/files/<번호>.csv` 30종)는 **저장소에 없습니다.** [공공데이터포털](https://www.data.go.kr)의 한국체육산업개발 파일데이터를 직접 내려받아 넣어야 합니다(번호 목록은 `backend/app/chaesan/ingest/specs.py`).
+
+```bash
+cd backend
+uv sync
+uv run python -m app.chaesan.ingest.load     # data/chaesan.sqlite 생성(약 2초). 파일 형식이 명세와 다르면 멈춘다
+uv run pytest                                # 전체 테스트
+```
+
+## 안전 원칙
+
+- 질문·데이터 속 문장은 **지시가 아니라 데이터**로만 다룹니다(`core/guard.py`: 정제 → 탐지 → 격리 → 출력 검사).
+- LLM이 쓴 SQL은 믿지 않습니다: SELECT만, 허용한 표만, 행 수 상한을 코드가 강제합니다(`sql_guard`, 작성 중).
+- API 키·토큰은 코드와 git에 두지 않습니다(`.env`는 gitignore). 테스트가 커밋된 파일의 비밀값·개인 식별 정보를 검사합니다.
+- 원본 데이터와 DB 파일은 커밋하지 않습니다.
+
+## 데이터 출처와 이용 조건
+
+- 한국체육산업개발 개방 파일데이터: 공공데이터포털(출처 표기). 이용허락범위는 데이터마다 다를 수 있어 각 상세 페이지를 확인하세요.
+- `15160326` 비정형데이터_생태갤러리: **공공누리 4유형(변경금지)**. 사진은 가공·재배포하지 않고 파일 목록만 사용합니다.
+- 연혁은 기관 누리집(2026-11-28 확인)의 공개 페이지를 사람이 저장한 것을 읽습니다. 자동 수집 코드는 만들지 않았습니다.
+
+## 작업 문서
+
+- [`CLAUDE.md`](CLAUDE.md): 이 브랜치(`feat/chaesan`)의 작업 규칙·설계 결정·일정(AI 코딩 도구용 지침).
+
+---
+
+## 🎉 전국 축제 정보 & 로컬 AI 큐레이션
 
 공공데이터포털 **전국문화축제표준데이터**(1,372건)를 **ChromaDB 벡터 DB**에 적재하고, 웹에서 10개씩 페이지네이션으로 보며
 로컬 **Ollama(Qwen 4B)** 로 축제 한 줄 요약을 받는 풀스택 MVP입니다. 전부 무료 도구만 사용합니다.
 
-## 구성
+### 구성
 
 | 영역 | 기술 |
 |------|------|
@@ -36,7 +123,7 @@
 └── README.md
 ```
 
-## 준비
+### 준비
 1. Python 3.12+, `uv`, Node.js 20+ 설치
 2. [Ollama](https://ollama.com) 설치 후 모델 받기
    ```bash
@@ -45,7 +132,7 @@
    ```
 3. 공공데이터포털에서 무료 API 키 발급 (전국문화축제표준데이터)
 
-## 실행
+### 실행
 ```bash
 # 1) 백엔드
 cd backend
@@ -62,7 +149,7 @@ npm run dev                                # http://localhost:5173
 npm run build                              # 배포용 빌드 (dist/)
 ```
 
-### macOS / Linux에서 실행
+#### macOS / Linux에서 실행
 코드는 `pathlib`·표준 라이브러리만 쓰고 Windows 전용 코드는 없어서 그대로 동작합니다(실제 Mac에서 돌려 보지는 못했습니다). 다른 점은 설치 명령뿐입니다.
 ```bash
 # 도구 설치 (macOS, Homebrew)
@@ -71,7 +158,7 @@ brew install cloudflared        # 배포(터널)할 때만
 ollama serve &                  # 또는 Ollama 앱 실행
 ollama pull qwen3.5:4b && ollama pull qwen3-embedding:4b
 
-git clone https://github.com/doeon082-blip/vide_coding.git && cd vide_coding
+git clone https://github.com/<계정>/<저장소명>.git && cd <저장소명>
 cd backend
 cp .env.example .env            # PUBLIC_DATA_API_KEY 입력 (.env는 저장소에 없으므로 기기마다 새로 만듦)
 uv sync && uv run python -m app.collector      # 벡터 DB(chroma_db)도 저장소에 없으므로 기기마다 다시 수집(약 1분)
@@ -82,7 +169,7 @@ cd frontend && cp .env.example .env && npm install && npm run dev
 - Apple Silicon은 Ollama가 Metal(GPU)을 써서 Windows CPU보다 빠른 편입니다.
 - Linux는 `brew` 대신 각 배포판 패키지 매니저/공식 설치 스크립트로 `uv`, `node`, `ollama`, `cloudflared`를 설치하면 됩니다.
 
-## API
+### API
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
 | GET | `/api/festivals?page=1&size=10&status=진행중` | 전체 개수 + 해당 페이지 목록. `status`(진행중/예정/완료, 생략=전체)는 서버 오늘 날짜 기준이며 `counts`로 상태별 건수 제공. 진행중=곧 끝나는 순, 예정=곧 시작하는 순, 완료=최근 종료 순 |
@@ -95,17 +182,17 @@ cd frontend && cp .env.example .env && npm install && npm run dev
 | POST | `/api/ai/ask` | 단발성 AI 큐레이터(레거시, 화면에서는 챗봇으로 대체) |
 | GET | `/api/health` | 상태 확인 |
 
-## 환경변수 (`backend/.env`)
+### 환경변수 (`backend/.env`)
 모든 주소·포트·모델명은 코드에 하드코딩하지 않고 환경변수로 분리했습니다.
 
 `PUBLIC_DATA_API_KEY`, `PUBLIC_DATA_API_URL`, `CHROMA_PERSIST_DIR`, `CHROMA_COLLECTION_NAME`,
 `OLLAMA_BASE_URL`, `OLLAMA_MODEL`, `OLLAMA_EMBED_MODEL`, `CORS_ORIGINS`, `LOG_LEVEL`, `LOG_DIR`
 
-## 로그
+### 로그
 - `backend/logs/app.log` (5MB 로테이션, 3개 보관) + 콘솔에 동시 기록 (`logs/`는 git 제외)
 - httpx 요청 로그는 WARNING 이상만 기록 → URL의 `serviceKey`가 로그에 남지 않음
 
-## 주요 기능
+### 주요 기능
 - 10개 단위 페이지네이션, 진행중/예정/완료 배지
 - 의미 기반 검색 + **오타 시 관련 연관검색어 칩** 제안(클릭하면 바로 검색)
 - 카드 커버(실제 사진 또는 축제명 기반 테마 타일), 축제 소개문, **사진 갤러리**(한국관광공사)
@@ -114,7 +201,7 @@ cd frontend && cp .env.example .env && npm install && npm run dev
 - **로컬 AI 활용**: ① 한 줄 요약(캐싱) ② 오타 교정 "혹시 ○○을(를) 찾으셨나요?" ③ 축제 요정 챗봇(근거 기반 추천)
 - DaisyUI 테마(기본 cupcake, 다크 모드 시스템 설정이면 dracula 자동 적용), 로딩 스켈레톤, 반응형 레이아웃
 
-## 🧚 축제 요정 챗봇 (RAG, `backend/app/chatbot.py`)
+### 🧚 축제 요정 챗봇 (RAG, `backend/app/chatbot.py`)
 핵심 원칙: **사실은 DB가, 말투는 AI가.** AI가 틀리거나 지어내도 사용자에게 나가지 않게 설계했습니다.
 
 ```
@@ -138,7 +225,7 @@ cd frontend && cp .env.example .env && npm install && npm run dev
 (실제 데이터+실제 Qwen, 질문 20개 → **추천 49건 중 사실 위반 0건**, AI 문장 24건 채택/25건 템플릿 대체).
 한계: 4B 모델이라 AI 문장이 가끔 어색하고(문법), 검증이 엄격해 템플릿 문장이 자주 쓰입니다. 데이터에 없는 정보는 알 수 없고, 검색 품질은 데이터 소개문의 충실도에 좌우됩니다.
 
-## 보안
+### 보안
 방어는 **프론트(빠른 차단) → 서버(최종 방어)** 두 겹이고, 외부로 공개되는 건 이 백엔드뿐입니다.
 
 | 영역 | 방어 | 위치 |
@@ -160,7 +247,7 @@ cd frontend && cp .env.example .env && npm install && npm run dev
 
 한계(알고 쓰세요): 입력 검증은 패턴 기반이라 완전하지 않고, 요청 제한은 메모리 기반(재시작 시 초기화·단일 프로세스)입니다. 계정/인증은 없습니다(공개 조회 서비스). Quick Tunnel로 공개하면 누구나 호출할 수 있으니 쓰지 않을 때는 터널을 끄세요.
 
-### 프롬프트 인젝션 방어 (`backend/app/prompt_injection_defense.py`)
+#### 프롬프트 인젝션 방어 (`backend/app/prompt_injection_defense.py`)
 로컬 LLM에 들어가는 텍스트에는 ① 사용자 질문(직접 인젝션)과 ② 공공데이터의 축제명·소개문(간접 인젝션: 데이터에 숨은 지시문)이 있습니다.
 
 | 단계 | 하는 일 |
@@ -177,7 +264,7 @@ cd frontend && cp .env.example .env && npm install && npm run dev
 
 한계: 패턴 탐지는 새로운 표현으로 우회될 수 있고, 4B 소형 모델은 지시 구분이 약합니다. 그래서 탐지에만 의존하지 않고 격리·출력 검증·후보 일치 검증·권한 최소화를 함께 둡니다(심층 방어).
 
-## 배포 (전부 무료)
+### 배포 (전부 무료)
 구성: **프론트 = GitHub Pages**, **백엔드 + Ollama = 내 PC**, 둘을 **Cloudflare Quick Tunnel**로 연결합니다.
 (Ollama 모델을 돌릴 수 있는 무료 클라우드가 없어 백엔드는 PC에 둡니다.)
 
@@ -198,11 +285,11 @@ cd frontend && cp .env.example .env && npm install && npm run dev
 > ⚠️ PC와 터널이 꺼져 있으면 배포된 화면에서 목록이 보이지 않습니다. AI 요약은 로컬 Ollama가 필요합니다.
 > 사진은 한국관광공사 TourAPI(같은 공공데이터포털 키, '국문 관광정보 서비스' 활용신청 필요)에서 가져옵니다. 축제 사진이 없으면 같은 지역 관광지 사진을 `○○ 지역` 배지와 함께 보여주고, 그것도 없으면 테마 색 타일을 보여줍니다. 일일 호출 한도가 있어 결과는 `backend/cache/photos.json`에 캐싱합니다.
 
-## 라이선스 · 출처
+### 라이선스 · 출처
 
 이 저장소의 **코드**는 MIT입니다([LICENSE](LICENSE)). 아래 데이터·모델·라이브러리는 각자의 조건을 따릅니다.
 
-### 데이터 / API
+#### 데이터 / API
 | 대상 | 조건 | 이 프로젝트에서의 처리 |
 |------|------|------------------------|
 | [전국문화축제표준데이터(15013104)](https://www.data.go.kr/data/15013104/standard.do) | 공공데이터포털 메타데이터상 이용허락범위 **제한 없음** | 출처 표기(푸터). 제공기관·파일별로 다를 수 있어 상세 페이지 확인 권장 |
@@ -215,19 +302,19 @@ cd frontend && cp .env.example .env && npm install && npm run dev
 
 그래서 제3유형 사진은 **자르지 않고 원본 비율**로 표시하고(라이트박스는 항상 원본 비율), 사진 확대 화면에 유형과 출처를 표기합니다. 제2·4유형(상업적 이용 금지)이 내려오면 표기만 하며, **상업적으로 쓸 경우 유형을 먼저 확인**해야 합니다.
 
-### AI 모델 (로컬 Ollama, 내 PC에서만 실행)
+#### AI 모델 (로컬 Ollama, 내 PC에서만 실행)
 | 모델 | 라이선스 |
 |------|----------|
 | `qwen3.5:4b` (요약·교정·큐레이터) | Apache 2.0 (`ollama show --license`로 확인) |
 | `qwen3-embedding:4b` (임베딩) | Apache 2.0 (Qwen 공식 모델 카드/GGUF 저장소 기준, Ollama 쪽 라이선스 출력은 비어 있음) |
 
-### 주요 라이브러리
+#### 주요 라이브러리
 FastAPI(MIT) · Pydantic(MIT) · Starlette/Uvicorn/httpx/python-dotenv(BSD-3) · ChromaDB(Apache-2.0) ·
 React/Vite/Tailwind CSS/DaisyUI(MIT) · Lucide(ISC) · TypeScript(Apache-2.0) · cloudflared(Apache-2.0, 배포 시)
 
 > 법률 자문이 아닙니다. 상업 서비스로 운영하거나 사진을 재배포할 계획이면 각 원문 약관을 직접 확인하세요.
 
-## 상업적 운영 전 체크리스트
+### 상업적 운영 전 체크리스트
 이 저장소의 코드는 MIT라 상업 이용에 제한이 없습니다. 아래는 **데이터·API·인프라** 쪽입니다(법률 자문 아님).
 
 | 항목 | 상태 | 해야 할 일 |
@@ -242,6 +329,6 @@ React/Vite/Tailwind CSS/DaisyUI(MIT) · Lucide(ISC) · TypeScript(Apache-2.0) ·
 
 → **개인 학습·포트폴리오·비영리 데모는 현재 구성으로 문제 없습니다.** 돈을 받거나 광고를 붙이는 상업 서비스라면 운영계정 전환, 정식 호스팅, 약관·개인정보처리방침, 공공데이터포털 이용약관 원문 확인(재판매 조항은 이번 조사에서 원문을 확인하지 못했습니다)이 먼저입니다.
 
-## 참고
+### 참고
 - 검색은 `점수 = 철자 점수(0~1) + 벡터 보너스(≤0.4)`입니다. 대표 질의 12개 중 11개가 1순위로 정확히 나왔습니다(`uv run pytest`로 철자 점수 단위 테스트 실행).
 - MIT License
