@@ -20,6 +20,28 @@ MAX_LLM_CALLS: Final = 3
 # LLM이 쓴 SQL에 강제하는 행 수 상한. 답변 근거 표와 D1 읽기 한도를 함께 지킨다.
 SQL_ROW_LIMIT: Final = 50
 
+# 문서 색인(docs)에 들어 있는 출처 = 데이터 카드 번호('history'는 연혁). ingest.docs.SOURCES와 같아야 한다(테스트가 확인).
+DOC_SOURCES: Final[frozenset[str]] = frozenset(
+    {"15089962", "15137825", "15137824", "15090715", "15143220", "15090257", "15090260", "history"}
+)
+
+# 서비스에도 올라가는 집계 표의 열 설명(카드에는 원본 표의 열만 있어서 LLM이 SQL을 쓸 수 있게 따로 적는다)
+AGGREGATE_SCHEMAS: Final[dict[str, str]] = {
+    "s_parking_hourly": (
+        "date TEXT(YYYY-MM-DD), hour INTEGER(0~23), weekday INTEGER(0=월 … 6=일), "
+        "is_holiday INTEGER(항상 NULL, 공휴일 자료 미연결), entries INTEGER(그 시간 입차 대수), exits INTEGER(그 시간 출차 대수)"
+    )
+}
+
+MAX_CANDIDATES: Final = 5  # 계획 LLM에게 보여 주는 후보 데이터 수
+EVIDENCE_ROWS_FOR_LLM: Final = 20  # 설명 LLM에게 넘기는 근거 행 수 상한(토큰·비용 보호)
+DOC_HITS: Final = 8  # 문서 검색 결과 상한
+MAX_ANSWER_CHARS: Final = 300
+STALE_DAYS: Final = 365  # 마지막 자료가 이보다 오래되면 '1년 넘게 갱신 안 됨' 배지
+PLAN_MAX_TOKENS: Final = 500
+ANSWER_MAX_TOKENS: Final = 300
+NOTICE: Final = "채산은 한국체육산업개발의 공식 서비스가 아닌 비공식 안내입니다."
+
 # LLM이 쓴 SQL의 길이와 표 참조 개수 상한. 긴 SQL과 여러 표의 교차 조인은 서버를 느리게 만드는 흔한 방법이다.
 MAX_SQL_LEN: Final = 2000
 MAX_SQL_TABLE_REFS: Final = 4

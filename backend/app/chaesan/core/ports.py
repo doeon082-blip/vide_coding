@@ -27,6 +27,10 @@ class LLMResult:
     output_tokens: int = 0
 
 
+class LLMError(RuntimeError):
+    """LLM을 부를 수 없거나 응답을 받지 못했다. 메시지에는 내부 주소·모델 이름·예외 상세를 담지 않는다(상세는 어댑터 로그에만)."""
+
+
 class DB(Protocol):
     async def query(self, sql: str, params: tuple[Any, ...] = ()) -> QueryResult:
         """읽기 전용 조회. 쓰기는 하지 않는다(로컬은 mode=ro로 연다)."""
@@ -44,4 +48,10 @@ class LLM(Protocol):
 class Clock(Protocol):
     async def now(self) -> datetime:
         """KST 시각(tz 포함)."""
+        ...
+
+
+class DemandSink(Protocol):
+    async def record(self, record: dict[str, Any]) -> None:
+        """개방 수요 한 건을 저장한다. record에는 질문 원문이 없다(core.demand가 코드화된 값만 만든다)."""
         ...

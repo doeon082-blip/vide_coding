@@ -35,6 +35,8 @@ class Meta:
     column_notes: dict[str, str] = field(default_factory=dict)
     # 문서 검색(D단계)에서 본문이 있는지. 제목·링크뿐이면 False.
     body_available: bool | None = None
+    # 답변에 붙일 배지 표시. check_operating=운영 여부는 센터 확인, mixed_sources=같은 기간 다른 자료와 값이 다름
+    flags: tuple[str, ...] = ()
 
 
 _A_FACILITY = "시민이 자주 묻는 시설·이용 정보"
@@ -185,6 +187,7 @@ META: Final[dict[str, Meta]] = {
             "정원 1건, 강좌금액 11건이 비어 있다. 기본값 날짜(1990-01-01) 1건은 날짜 없음으로 처리했다.",
         ),
         aliases=("올림픽수영장", "수영장"),
+        flags=("check_operating",),
         column_notes={
             "time_start": "강좌 시작 시각(HH:MM)",
             "time_end": "강좌 종료 시각(HH:MM)",
@@ -204,6 +207,7 @@ META: Final[dict[str, Meta]] = {
             "수강대상이 1,891건 비어 있다. 기본값 날짜(1990-01-01) 24건은 날짜 없음으로 처리했다.",
         ),
         aliases=("올림픽스포츠센터", "스포츠센터"),
+        flags=("check_operating",),
     ),
     "15114776": Meta(
         "sports_courses",
@@ -218,6 +222,7 @@ META: Final[dict[str, Meta]] = {
             "period_end 9999-12-31(운영 중 표시) 359건은 센터에 운영 여부 확인 안내. 강습반 439건, 강좌금액 70건이 비어 있다.",
         ),
         aliases=("일산스포츠센터", "일산"),
+        flags=("check_operating",),
         column_notes={"start_month": "뜻 미확인(매달 22~26일 값). 쓰지 않는다"},
     ),
     "15118652": Meta(
@@ -233,6 +238,7 @@ META: Final[dict[str, Meta]] = {
             "종목 3건, 금액 11건이 비어 있다. 강좌명에 별표(★) 같은 장식 문자가 섞여 있다.",
         ),
         aliases=("분당스포츠센터", "분당"),
+        flags=("check_operating",),
     ),
     "15119388": Meta(
         "media_gallery",
@@ -274,6 +280,7 @@ META: Final[dict[str, Meta]] = {
             "포털 설명의 기간과 실제 기간의 대조는 미확인이다(카드는 실제 기간을 쓴다).",
         ),
         aliases=("주차", "월별주차"),
+        flags=("mixed_sources",),
         column_notes={"cars": "월 주차 대수(집계 기준은 미확인)"},
     ),
     "15133891": Meta(
@@ -356,6 +363,7 @@ META: Final[dict[str, Meta]] = {
             "같은 달 월별주차현황(15131671)의 올림픽공원 59,808대와 3.6배 다르다(원인 미확인). 두 값을 섞지 않고 함께 보여 준다.",
         ),
         aliases=("입출차", "입차", "출차"),
+        flags=("mixed_sources",),
         column_notes={"entry_at": "입차 일시", "exit_at": "출차 일시(8월 값 포함)"},
     ),
     "15143220": Meta(

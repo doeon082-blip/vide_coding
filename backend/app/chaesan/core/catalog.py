@@ -47,6 +47,7 @@ class Card:
     caveats: tuple[str, ...]
     example_questions: tuple[str, ...]
     aliases: tuple[str, ...]
+    flags: tuple[str, ...]
     summary: str | None
     source_kind: str | None
     body_available: bool | None
@@ -105,6 +106,7 @@ def _card(raw: dict[str, Any]) -> Card:
         rows=raw["rows"], period_start=period.get("start"), period_end=period.get("end"),
         period_precision=period.get("precision"), last_data_date=raw["last_data_date"],
         caveats=tuple(raw["caveats"]), example_questions=tuple(raw["example_questions"]), aliases=tuple(raw["aliases"]),
+        flags=tuple(raw.get("flags", ())),
         summary=raw.get("summary"), source_kind=raw.get("source_kind"), body_available=raw.get("body_available"),
         columns=tuple(raw["columns"]),
     )  # fmt: skip

@@ -123,6 +123,7 @@ def file_card(con: sqlite3.Connection, spec: FileSpec, meta: Meta) -> dict[str, 
         "last_data_date": period["end"] if period else None,
         "columns": _columns(con, spec.table, meta),
         "caveats": list(meta.caveats), "example_questions": list(meta.questions), "aliases": list(meta.aliases),
+        "flags": list(meta.flags),
         "load": {"file": load[1], "encoding": load[2], "sha256": load[3]},
     }  # fmt: skip
 
@@ -175,7 +176,7 @@ def history_card(html_path: Path = HISTORY_HTML) -> dict[str, Any]:
         "period": {"start": fmt(first), "end": fmt(last), "precision": "month", "basis": "연혁 항목의 연·월"},
         "last_data_date": fmt(last), "columns": [],
         "caveats": list(meta.caveats), "example_questions": list(meta.questions), "aliases": list(meta.aliases),
-        "load": {"file": html_path.name, "encoding": "utf-8", "sha256": None},
+        "flags": [], "load": {"file": html_path.name, "encoding": "utf-8", "sha256": None},
     }  # fmt: skip
 
 
@@ -206,7 +207,7 @@ def api_cards(con: sqlite3.Connection) -> list[dict[str, Any]]:
                     "아직 연결하지 않은 오픈API다. 질문이 이 데이터를 가리키면 '아직 연결 안 됨'으로 답하고 "
                     "개방 수요가 아니라 '연결 예정'으로 기록한다."
                 ],
-                "example_questions": [], "aliases": [], "load": None,
+                "example_questions": [], "aliases": [], "flags": [], "load": None,
             }
         )  # fmt: skip
     ids = [c["id"] for c in cards]
