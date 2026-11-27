@@ -16,6 +16,7 @@ CORE = BACKEND / "app" / "chaesan" / "core"
 
 # 지시서 4절 구조 중 지금 단계까지 있어야 하는 파일. 다른 파일(catalog, planner, search, demand)은 C~E단계에서 더한다.
 EXPECTED_CORE = {"__init__.py", "config.py", "ports.py", "guard.py", "when.py", "sql_guard.py", "answer.py", "typo.py"}
+EXPECTED_INGEST = {"__init__.py", "specs.py", "convert.py", "load.py", "aggregate.py"}
 
 
 def _core_files() -> list[Path]:
@@ -25,6 +26,7 @@ def _core_files() -> list[Path]:
 def test_structure() -> None:
     assert (BACKEND / "app" / "chaesan" / "__init__.py").is_file()
     assert EXPECTED_CORE <= {p.name for p in _core_files()}
+    assert EXPECTED_INGEST <= {p.name for p in (BACKEND / "app" / "chaesan" / "ingest").glob("*.py")}
 
 
 @pytest.mark.parametrize("path", _core_files(), ids=lambda p: p.name)
