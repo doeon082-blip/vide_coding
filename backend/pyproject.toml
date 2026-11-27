@@ -8,9 +8,13 @@ authors = [
 requires-python = ">=3.12"
 dependencies = [
     "chromadb>=1.5.9",
+    "duckdb>=2.0.1",
     "fastapi>=0.165.0",
     "httpx>=0.28.1",
+    "pyproj>=3.8.0",
+    "pyshp>=3.1.9",
     "python-dotenv>=1.2.4",
+    "shapely>=2.2.0",
     "uvicorn>=0.54.0",
 ]
 
