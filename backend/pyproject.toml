@@ -41,6 +41,7 @@ ignore = ["RUF001", "RUF002", "RUF003"]  # 한국어 주석·문자열의 전각
 "tests/*" = ["S101", "S608", "PT018", "S603", "S607"]  # assert, 고정 SQL 조합, 테스트가 git을 부르는 것은 의도된 사용
 "tests/test_chaesan_robustness.py" = ["S311"]  # 고정 시드의 재현용 난수이지 보안용 난수가 아니다
 "tests/test_chaesan_correct.py" = ["S311"]
+"tests/test_chaesan_core_functions.py" = ["S311"]
 "tests/test_chaesan_search.py" = ["S311"]
 "app/chaesan/ingest/*" = ["S608"]  # 표·열 이름은 명세 상수에서만 오고 사용자 입력이 아니다(cards.py가 한 번 더 검사)
 "app/chaesan/ingest/card_meta.py" = ["E501"]  # 긴 한국어 주의점 문장(데이터). 줄바꿈하면 오히려 읽기 어렵다

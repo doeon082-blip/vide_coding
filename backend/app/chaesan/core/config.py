@@ -20,6 +20,10 @@ MAX_LLM_CALLS: Final = 3
 # LLM이 쓴 SQL에 강제하는 행 수 상한. 답변 근거 표와 D1 읽기 한도를 함께 지킨다.
 SQL_ROW_LIMIT: Final = 50
 
+# LLM이 쓴 SQL의 길이와 표 참조 개수 상한. 긴 SQL과 여러 표의 교차 조인은 서버를 느리게 만드는 흔한 방법이다.
+MAX_SQL_LEN: Final = 2000
+MAX_SQL_TABLE_REFS: Final = 4
+
 # 로컬 개발 모델(ollama list로 설치 확인함). 서비스(Workers AI) 모델 이름은 G단계에서 확인 후 넣는다.
 LOCAL_MODEL: Final = "gemma4:26b"
 
