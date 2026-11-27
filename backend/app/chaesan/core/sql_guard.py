@@ -21,7 +21,8 @@ def validate_sql(sql: str, allowed_tables: set[str]) -> str:
     2. 주석(`--`, `/*`)이 있으면 거부. 주석으로 뒤쪽 검사를 숨길 수 있다.
     3. 대소문자 무시하고 SELECT로 시작해야 한다(WITH·PRAGMA·ATTACH·INSERT 등은 거부).
     4. 금지어가 단어로 들어 있으면 거부: insert update delete drop alter create attach detach pragma
-       replace vacuum. 정규식 `\\b`로 단어 경계를 본다("updated_at" 같은 열 이름은 통과해야 함).
+       replace vacuum. 단어 경계는 `(?<![A-Za-z0-9_])단어(?![A-Za-z0-9_])`로 본다
+       ("updated_at" 같은 열 이름은 통과해야 함). `\\b`는 한글을 단어 글자로 봐서 "DROP문" 같은 붙여 쓰기를 놓친다.
     5. FROM·JOIN 뒤에 오는 표 이름을 모두 모아, 하나라도 allowed_tables에 없으면 거부.
        sqlite_master 같은 시스템 표도 이 단계에서 걸러진다. FROM 이 아예 없으면 거부.
     6. 끝에 `LIMIT n`이 있으면 n을 min(n, SQL_ROW_LIMIT)으로, 없으면 `LIMIT SQL_ROW_LIMIT`를 붙인다.

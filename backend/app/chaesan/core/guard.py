@@ -99,9 +99,11 @@ _PATTERNS: dict[str, re.Pattern[str]] = {
     ),
     "fake_delimiter": re.compile(_FAKE_DELIMS.pattern, re.IGNORECASE),
     # SQL을 질문에 직접 넣어 계획 단계를 건너뛰려는 시도. 시민 질문에는 거의 나오지 않는다.
+    # 경계는 \b 대신 영문·숫자 기준으로 본다. 파이썬 \b는 한글도 단어 글자로 봐서 "DROP TABLE을"을 놓친다.
     "sql_injection": re.compile(
-        r"\b(?:drop|delete|insert|update|alter|attach|pragma)\b[^.\n]{0,20}\b(?:table|from|into|database|set)\b"
-        r"|\bunion\b\s+(?:all\s+)?select\b|sqlite_master",
+        r"(?<![a-z0-9_])(?:drop|delete|insert|update|alter|attach|pragma)(?![a-z0-9_])[^.\n]{0,20}"
+        r"(?<![a-z0-9_])(?:table|from|into|database|set)(?![a-z0-9_])"
+        r"|(?<![a-z0-9_])union\s+(?:all\s+)?select(?![a-z0-9_])|sqlite_master",
         re.IGNORECASE,
     ),
     "force_output": re.compile(
