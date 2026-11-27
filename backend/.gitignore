@@ -1,0 +1,17 @@
+# backend 폴더 안에서 git을 실행해도 비밀값·원본 데이터가 올라가지 않게 하는 안전망.
+# (루트 .gitignore와 같은 규칙. backend/.git에 중첩 저장소가 있어 그 안에서 실수로 `git add -A`를 해도 막힌다.)
+.env
+.env.*
+!.env.example
+data/
+*.sqlite
+*.sqlite3
+*.db
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+logs/
+chroma_db/
+cache/

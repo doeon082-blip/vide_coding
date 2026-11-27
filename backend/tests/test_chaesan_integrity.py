@@ -15,8 +15,13 @@ REPO = BACKEND.parent
 CORE = BACKEND / "app" / "chaesan" / "core"
 
 # 지시서 4절 구조 중 지금 단계까지 있어야 하는 파일. 다른 파일(catalog, planner, search, demand)은 C~E단계에서 더한다.
-EXPECTED_CORE = {"__init__.py", "config.py", "ports.py", "guard.py", "when.py", "sql_guard.py", "answer.py", "typo.py"}
-EXPECTED_INGEST = {"__init__.py", "specs.py", "convert.py", "load.py", "aggregate.py"}
+EXPECTED_CORE = {
+    "__init__.py", "config.py", "ports.py", "guard.py", "when.py", "sql_guard.py", "answer.py", "typo.py",
+    "catalog.py", "search.py", "correct.py",
+}  # fmt: skip
+EXPECTED_INGEST = {
+    "__init__.py", "specs.py", "convert.py", "load.py", "aggregate.py", "card_meta.py", "cards.py", "docs.py", "aliases.py",
+}  # fmt: skip
 
 
 def _core_files() -> list[Path]:
@@ -97,3 +102,17 @@ def test_no_secrets_in_tracked_files() -> None:
                 line = text.count("\n", 0, m.start()) + 1
                 hits.append(f"{rel}:{line}")  # 값은 출력하지 않는다
     assert not hits, f"비밀값으로 보이는 문자열: {hits}"
+
+
+def _tool(*args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run([sys.executable, "-m", *args], cwd=BACKEND, capture_output=True, text=True, check=False)
+
+
+@pytest.mark.parametrize("tool", [("ruff", "check"), ("ruff", "format", "--check"), ("mypy",)], ids=lambda t: " ".join(t))
+def test_code_style_and_types_are_clean(tool: tuple[str, ...]) -> None:
+    """규칙 15(최신 실무 양식): 린트·포맷·타입 검사가 항상 깨끗해야 한다. 개발 도구가 없으면 건너뛴다."""
+    probe = _tool(tool[0], "--version")
+    if probe.returncode != 0:
+        pytest.skip(f"{tool[0]} 미설치")
+    result = _tool(*tool)
+    assert result.returncode == 0, (result.stdout + result.stderr)[-1500:]

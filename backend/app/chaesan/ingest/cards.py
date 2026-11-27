@@ -29,6 +29,7 @@ from app.chaesan.ingest.card_meta import (
 )
 from app.chaesan.ingest.load import BACKEND_DIR, DB_PATH
 from app.chaesan.ingest.specs import SPECS, FileSpec
+from app.chaesan.local.db import ro_uri
 
 CARDS_DIR: Final = BACKEND_DIR / "data" / "cards"
 HISTORY_HTML: Final = BACKEND_DIR / "data" / "raw" / "web" / "history.html"
@@ -223,7 +224,7 @@ def build_cards(db_path: Path = DB_PATH, history_html: Path = HISTORY_HTML) -> l
         raise CardError(
             f"명세와 카드 메타가 다르다: 메타에만 {sorted(set(META) - spec_ids)}, 명세에만 {sorted(spec_ids - set(META))}"
         )
-    con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)  # 읽기 전용
+    con = sqlite3.connect(ro_uri(db_path), uri=True)  # 읽기 전용
     try:
         cards = [file_card(con, s, META[s.id]) for s in SPECS]
         cards.append(history_card(history_html))

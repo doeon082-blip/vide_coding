@@ -67,3 +67,14 @@ def test_no_personal_identifiers_in_tracked_files() -> None:
         low = p.read_text(encoding="utf-8", errors="ignore").lower()
         hits += [f"{rel}" for n in needles if n in low]
     assert not hits, f"개인 식별 정보로 보이는 문자열이 있는 파일: {sorted(set(hits))}"
+
+
+def test_backend_gitignore_protects_secrets_even_from_inside_backend() -> None:
+    """backend/에 별도의 .git(중첩 저장소)이 있어, 그 안에서 `git add -A`를 해도 .env·데이터가 올라가지 않아야 한다."""
+    required = {".env", "data/", "*.sqlite"}
+    lines = {ln.strip() for ln in (BACKEND / ".gitignore").read_text(encoding="utf-8").splitlines()}
+    assert required <= lines and "!.env.example" in lines
+    if (BACKEND / ".git").exists():
+        for path in (".env", "data/chaesan.sqlite", "data/raw/files/15089962.csv"):
+            checked = subprocess.run(["git", "check-ignore", "-q", path], cwd=BACKEND, check=False)
+            assert checked.returncode == 0, f"backend 안에서 {path}가 무시되지 않는다"

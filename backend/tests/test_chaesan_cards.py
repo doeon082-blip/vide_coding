@@ -182,6 +182,14 @@ def test_monthly_parking_period_and_history(cards: dict[str, dict[str, Any]]) ->
         ("SELECT COUNT(*) FROM t_15147873 WHERE description IS NULL", 29),
         ("SELECT COUNT(DISTINCT reg_date) FROM t_15089962", 8),
         ("SELECT COUNT(DISTINCT member_type) FROM t_15133891", 2),
+        ("SELECT COUNT(*) FROM t_15137825", 1958),
+        ("SELECT COUNT(DISTINCT report_date || '|' || title) FROM t_15137825", 1619),
+        ("SELECT COUNT(*) FROM (SELECT 1 FROM t_15137825 GROUP BY report_date, title HAVING COUNT(*) > 1)", 168),
+        (
+            "SELECT COUNT(*) FROM (SELECT 1 FROM t_15137825 GROUP BY report_date, title "
+            "HAVING COUNT(*) > 1 AND COUNT(*) = COUNT(DISTINCT media))",
+            114,
+        ),
     ],
 )
 def test_numbers_cited_in_caveats(db_path: Path, sql: str, expected: float) -> None:
