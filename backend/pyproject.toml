@@ -16,9 +16,35 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "mypy>=2.4.1",
     "pytest>=9.2.0",
+    "ruff>=0.17.6",
 ]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+
+# 채산 코드(app/chaesan, tests/test_chaesan_*)만 검사한다. 기존 축제 앱 코드는 규칙 5에 따라 건드리지 않는다.
+[tool.ruff]
+line-length = 130
+target-version = "py312"
+include = ["app/chaesan/**/*.py", "tests/test_chaesan_*.py"]
+
+[tool.ruff.lint]
+# E/F 기본 오류, I import 정렬, UP 최신 문법, B 버그 가능성, SIM 단순화, RUF 기타, S 보안, C4 컴프리헨션, PT 테스트
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF", "S", "C4", "PT"]
+ignore = ["RUF001", "RUF002", "RUF003"]  # 한국어 주석·문자열의 전각 문자 경고는 의도된 것
+
+# PT018(여러 조건을 한 assert로 쓰지 말라)은 끈다: `assert w is not None and w.conflict`처럼 짧은 복합 단언이 오히려 읽기 쉽다.
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "S608", "PT018", "S603", "S607"]  # assert, 고정 SQL 조합, 테스트가 git을 부르는 것은 의도된 사용
+"tests/test_chaesan_robustness.py" = ["S311"]  # 고정 시드의 재현용 난수이지 보안용 난수가 아니다
+"app/chaesan/ingest/*" = ["S608"]  # 표·열 이름은 명세 상수에서만 오고 사용자 입력이 아니다(cards.py가 한 번 더 검사)
+"app/chaesan/ingest/card_meta.py" = ["E501"]  # 긴 한국어 주의점 문장(데이터). 줄바꿈하면 오히려 읽기 어렵다
+
+[tool.mypy]
+python_version = "3.12"
+files = ["app/chaesan"]
+strict = true
+warn_unreachable = true
