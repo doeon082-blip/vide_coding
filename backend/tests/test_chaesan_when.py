@@ -55,3 +55,29 @@ def test_tomorrow_is_future() -> None:
 @pytest.mark.parametrize("msg", ["테니스장은 몇 월에 붐벼?", "수영장 강좌 알려줘", "1990-01-01"])
 def test_no_period(msg: str) -> None:
     assert parse_when(msg, TODAY) is None
+
+
+@pytest.mark.parametrize(
+    "msg, start, end",
+    [
+        ("10월 1일 행사", date(2026, 10, 1), date(2026, 10, 1)),  # 점검 전에는 10월 전체로 읽었다
+        ("2024년 7월 15일", date(2024, 7, 15), date(2024, 7, 15)),
+        ("2월 30일", date(2026, 2, 1), date(2026, 2, 28)),  # 없는 날은 달 전체
+        ("이번 주 행사", date(2026, 11, 23), date(2026, 11, 29)),
+        ("지난주 이용자", date(2026, 11, 16), date(2026, 11, 22)),
+    ],
+)
+def test_day_and_week(msg: str, start: date, end: date) -> None:
+    w = parse_when(msg, TODAY)
+    assert w is not None and (w.start, w.end) == (start, end)
+
+
+def test_this_weekend_has_dates_and_condition() -> None:
+    w = parse_when("이번 주말 행사 있어?", date(2026, 11, 26))  # 목요일
+    assert w is not None and (w.start, w.end) == (date(2026, 11, 28), date(2026, 11, 29))
+    assert w.weekdays == frozenset({5, 6}) and w.future and w.label.count("주말") == 1
+
+
+def test_month_day_does_not_eat_sunday() -> None:
+    w = parse_when("7월 일요일", TODAY)
+    assert w is not None and (w.start, w.end) == (date(2026, 7, 1), date(2026, 7, 31)) and w.weekdays == frozenset({6})

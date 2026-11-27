@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, timedelta
 
 
@@ -19,16 +19,18 @@ class When:
     end: date | None
     label: str
     weekdays: frozenset[int] | None = None  # 0=월 … 6=일. "주말"이면 {5, 6}
-    future: bool = False  # 예보가 필요한 질문(내일·모레). 1단계에서는 "아직 연결 안 됨"으로 답한다
+    future: bool = False  # 기간이 오늘 이후(내일·이번 주말 등). 예보가 필요한지는 답변 엔진이 갈래를 보고 정한다
 
 
 _WEEKEND = frozenset({5, 6})
 _WEEKDAYS = frozenset({0, 1, 2, 3, 4})
 _DAY_NAMES = {"월": 0, "화": 1, "수": 2, "목": 3, "금": 4, "토": 5, "일": 6}
 
-_YEAR_MONTH = re.compile(r"(?<!\d)((?:19|20)\d{2})\s*년\s*(1[0-2]|0?[1-9])\s*월")
+# 일(day)은 선택. "7월 1일"은 그날 하루, "7월"은 한 달 전체.
+_DAY = r"(?:\s*(3[01]|[12]\d|0?[1-9])\s*일(?!\s*요))?"
+_YEAR_MONTH = re.compile(r"(?<!\d)((?:19|20)\d{2})\s*년\s*(1[0-2]|0?[1-9])\s*월" + _DAY)
 _YEAR = re.compile(r"(?<!\d)((?:19|20)\d{2})\s*년")
-_MONTH = re.compile(r"(?<!\d)(1[0-2]|0?[1-9])\s*월")
+_MONTH = re.compile(r"(?<!\d)(1[0-2]|0?[1-9])\s*월" + _DAY)
 _DAY_OF_WEEK = re.compile(r"([월화수목금토일])요일")
 
 
@@ -39,6 +41,15 @@ def _month_end(year: int, month: int) -> date:
 
 def _month(year: int, month: int) -> tuple[date, date]:
     return date(year, month, 1), _month_end(year, month)
+
+
+def _span(year: int, month: int, day: str | None, label: str) -> When:
+    """M월 또는 M월 D일 → When. 달력에 없는 날(2월 30일)은 한 달 전체로 읽고 라벨에 일을 붙이지 않는다."""
+    start, end = _month(year, month)
+    if day and int(day) <= end.day:
+        d = date(year, month, int(day))
+        return When(d, d, f"{label} {int(day)}일")
+    return When(start, end, label)
 
 
 def _overlaps(a: tuple[date, date], b: tuple[date, date]) -> bool:
@@ -68,14 +79,23 @@ def _weekday_filter(msg: str) -> tuple[frozenset[int] | None, str]:
 def _period(msg: str, today: date, data_range: tuple[date, date] | None) -> When | None:
     if "모레" in msg:
         d = today + timedelta(days=2)
-        return When(d, d, "모레", future=True)
+        return When(d, d, "모레")
     if "내일" in msg:
         d = today + timedelta(days=1)
-        return When(d, d, "내일", future=True)
+        return When(d, d, "내일")
     m = _YEAR_MONTH.search(msg)
     if m:
         y, mo = int(m.group(1)), int(m.group(2))
-        return When(*_month(y, mo), f"{y}년 {mo}월")
+        return _span(y, mo, m.group(3), f"{y}년 {mo}월")
+    monday = today - timedelta(days=today.weekday())
+    if re.search(r"이번\s*주말", msg):  # '주말' 조건보다 먼저: 이번 주의 토·일 날짜
+        sat = monday + timedelta(days=5)
+        return When(sat, sat + timedelta(days=1), f"이번 주말({sat:%m/%d}~)", weekdays=_WEEKEND)
+    if re.search(r"이번\s*주(?!말)", msg):
+        return When(monday, monday + timedelta(days=6), "이번 주")
+    if re.search(r"(?:지난|저번)\s*주(?!말)", msg):
+        start = monday - timedelta(days=7)
+        return When(start, start + timedelta(days=6), "지난주")
     if re.search(r"지난\s*달|저번\s*달", msg):
         prev_end = today.replace(day=1) - timedelta(days=1)
         return When(*_month(prev_end.year, prev_end.month), f"지난달({prev_end.year}년 {prev_end.month}월)")
@@ -87,7 +107,7 @@ def _period(msg: str, today: date, data_range: tuple[date, date] | None) -> When
     if m:  # "작년 7월", "올해 3월"처럼 상대 연도가 붙으면 그 연도, 아니면 데이터 기준으로 정한다
         mo = int(m.group(1))
         y = today.year - 1 if last_year else today.year if this_year else _resolve_month(mo, today, data_range)
-        return When(*_month(y, mo), f"{y}년 {mo}월")
+        return _span(y, mo, m.group(2), f"{y}년 {mo}월")
     if last_year:
         y = today.year - 1
         return When(date(y, 1, 1), date(y, 12, 31), f"작년({y}년)")
@@ -112,7 +132,10 @@ def parse_when(msg: str, today: date, data_range: tuple[date, date] | None = Non
     if period is None and weekdays is None:
         return None
     if period is None:
-        return When(None, None, wlabel, weekdays=weekdays)
-    if weekdays is None:
-        return period
-    return When(period.start, period.end, f"{period.label} {wlabel}", weekdays=weekdays, future=period.future)
+        result = When(None, None, wlabel, weekdays=weekdays)
+    elif weekdays is None or period.weekdays is not None:  # "이번 주말"은 이미 요일 조건을 가진다
+        result = period
+    else:
+        result = replace(period, label=f"{period.label} {wlabel}", weekdays=weekdays)
+    # 미래 여부는 경우마다 따로 적지 않고 시작일 하나로 정한다(빠뜨림 방지)
+    return replace(result, future=result.start is not None and result.start > today)
