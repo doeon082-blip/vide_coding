@@ -12,6 +12,7 @@ core/에 있으므로 표준 라이브러리만 쓴다(서비스에 app/ 패키�
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import logging
 import re
@@ -163,8 +164,14 @@ def detect(text: str) -> Detection:
     return Detection(hits)
 
 
+# 프로세스마다 새로 만드는 키(저장하지 않음). 키 없는 SHA-256 앞부분은 짧은 질문이면 후보를 대입해
+# 원문을 알아낼 수 있어서(사전 공격) 같은 프로세스 안에서만 같은 값이 나오는 HMAC으로 바꿨다:
+# 같은 공격 문장의 반복 횟수는 셀 수 있고, 원문은 로그만으로 되돌릴 수 없다.
+_FP_KEY = secrets.token_bytes(16)
+
+
 def _fingerprint(text: str) -> str:
-    return hashlib.sha256(text.encode("utf-8", "ignore")).hexdigest()[:8]
+    return hmac.new(_FP_KEY, text.encode("utf-8", "ignore"), hashlib.sha256).hexdigest()[:8]
 
 
 def log_event(kind: str, text: str, hits: list[str]) -> None:
