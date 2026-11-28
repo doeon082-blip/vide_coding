@@ -72,6 +72,7 @@ class OllamaLLM:
     ) -> None:
         self._base = (base_url or os.getenv("OLLAMA_BASE_URL") or "http://localhost:11434").rstrip("/")
         self._model = model
+        self.label = f"ollama:{model}"  # 사용 기록에 남기는 이름(주소·키 없음)
         self._timeout = timeout or OLLAMA_TIMEOUT_S
         self._transport = transport  # 테스트에서 가짜 서버를 끼우는 자리
 
@@ -121,6 +122,7 @@ class WorkersAILLM:
         self._url = f"https://api.cloudflare.com/client/v4/accounts/{account}/ai/v1/chat/completions"
         self._headers = {"Authorization": f"Bearer {token}"}
         self._model = name
+        self.label = f"workers_ai:{name}"
         self._timeout = timeout or WORKERS_AI_TIMEOUT_S
         self._transport = transport
 
