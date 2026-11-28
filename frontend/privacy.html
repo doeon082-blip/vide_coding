@@ -1,0 +1,60 @@
+<!doctype html>
+<!-- 개인정보·기록 안내. 스크립트 없는 정적 페이지(CSP: 같은 출처의 파일만). 서버가 실제로 기록하는 것과 어긋나지 않게 backend/app/chaesan/local/usage_log.py와 함께 고친다. -->
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'">
+<title>개인정보·기록 안내 · 채산 (비공식)</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/doc.css">
+</head>
+<body>
+<main class="doc">
+  <p><a href="./">← 채산으로 돌아가기</a></p>
+  <h1>개인정보·기록 안내</h1>
+  <p class="lead">채산은 한국체육산업개발의 공식 서비스가 아닌 <strong>비공식</strong> 안내 서비스입니다. 질문하시는 분의 정보를 가능한 한 적게 다루도록 만들었어요. 아래에 무엇을 기록하고, 무엇을 기록하지 않는지, 질문이 어디로 가는지 적었습니다.</p>
+
+  <h2>한눈에 보기</h2>
+  <ul class="points">
+    <li><b>질문과 답변의 글은 저장하지 않아요.</b> 이 화면의 대화는 브라우저 안에만 있고, 새로고침하거나 "새 대화"를 누르면 사라져요.</li>
+    <li><b>회원가입·로그인·쿠키가 없어요.</b> 이름, 연락처 등을 묻지 않아요.</li>
+    <li><b>IP 주소 원문도 저장하지 않아요.</b> 하루마다 바뀌는 가명 값으로만 사용자 수를 세어요.</li>
+    <li><b>답을 만드는 동안 질문이 외부 AI 서비스로 전송돼요.</b> 아래 "질문이 가는 곳"을 확인하세요.</li>
+  </ul>
+
+  <h2>기록하는 것</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th scope="col">기록</th><th scope="col">내용</th><th scope="col">목적</th><th scope="col">보관</th></tr></thead>
+    <tbody>
+      <tr><td>처리 기록</td><td>시각, 처리 결과(답함·모름 등), 질문 갈래, 걸린 시간, AI 호출·토큰 수, 사용한 자료 번호, 질문 글자 수, 가명 처리한 값</td><td>오류 확인, 속도·사용량 파악, 악용 방지</td><td>30일 뒤 자동 삭제</td></tr>
+      <tr><td>일별 집계</td><td>위 기록을 날짜별로 센 숫자(개인을 구분하는 값 없음)</td><td>서비스 이용 통계</td><td>집계만 장기 보관</td></tr>
+      <tr><td>개방 수요 기록</td><td>답하지 못한 질문의 <em>주제</em>(월, 사유 코드, 갈래, 자료 번호, 자료에 있는 낱말). 질문 문장은 없음</td><td>어떤 공개 자료가 더 필요한지 파악</td><td>원문이 없는 통계로 보관</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="note">가명 값은 하루마다 바뀌고 서버 메모리에만 있는 키로 만들어서, 같은 날의 반복 질문 수를 세는 데만 쓸 수 있고 원문이나 다른 날의 기록과 이을 수 없어요.</p>
+
+  <h2>기록하지 않는 것</h2>
+  <ul>
+    <li>질문 원문과 답변 원문</li>
+    <li>IP 주소 원문, 브라우저 정보(헤더), 쿠키, 위치</li>
+    <li>이름·연락처 등 개인을 알아볼 수 있는 정보</li>
+  </ul>
+
+  <h2>질문이 가는 곳 (국외 이전 안내)</h2>
+  <p>질문에 답하려면 문장을 AI에게 보내야 해요. 서비스에서는 <strong>Cloudflare Workers AI</strong>(미국 Cloudflare, Inc.가 운영하며 서버가 해외에 있을 수 있어요)로 질문과 찾은 자료의 일부가 전송돼요. 채산 서버는 이 내용을 저장하지 않지만, 전송받은 업체가 어떻게 다루는지는 그 업체의 정책을 따르며 채산이 대신 보증할 수 없어요.</p>
+  <p>내 컴퓨터에서 직접 실행하는 개발 환경에서는 외부로 전송되지 않아요. 서버 없이 보는 예비 화면(예시 답)은 질문을 어디로도 보내지 않아요.</p>
+
+  <h2>이렇게 써 주세요</h2>
+  <ul>
+    <li>이름, 전화번호, 주민등록번호, 계좌·카드번호, 비밀번호, 인증번호 같은 <strong>개인정보와 민감한 정보는 입력하지 마세요.</strong></li>
+    <li>채산의 답은 틀릴 수 있어요. 중요한 내용은 기관에 직접 확인하세요.</li>
+  </ul>
+  <p class="note">이 안내는 2026-11-28 기준이며, 기록하는 내용이 바뀌면 이 페이지도 함께 고칩니다.</p>
+</main>
+</body>
+</html>
