@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import hashlib
 import json
+import re
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -198,3 +202,74 @@ def test_build_engine_can_turn_demand_recording_off(tmp_path: Any) -> None:
         pytest.skip("데이터 없음")
     assert build_engine(record_demand=False)._sink is None
     assert build_engine()._sink is not None
+
+
+# --------------------------------------------------------------------------- 화면(GET /)
+
+HTML = (Path(__file__).resolve().parents[1] / "app" / "chaesan" / "local" / "static" / "index.html").read_text(encoding="utf-8")
+
+
+def test_page_is_served_with_hash_only_csp() -> None:
+    c, _ = client()
+    with c:
+        r = c.get("/")
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("text/html")
+    csp = r.headers["content-security-policy"]
+    assert "'unsafe-inline'" not in csp
+    assert "'unsafe-eval'" not in csp
+    assert "default-src 'none'" in csp
+    assert "connect-src 'self'" in csp
+    assert "frame-ancestors 'none'" in csp
+    # 헤더의 해시가 실제 인라인 코드의 해시와 같아야 브라우저가 실행한다
+    for tag in ("script", "style"):
+        body = re.search(rf"<{tag}>(.*?)</{tag}>", r.text, re.DOTALL).group(1)  # type: ignore[union-attr]
+        digest = base64.b64encode(hashlib.sha256(body.encode("utf-8")).digest()).decode()
+        assert f"'sha256-{digest}'" in csp
+    assert r.headers["x-content-type-options"] == "nosniff"
+    assert r.headers["cache-control"] == "no-store"
+
+
+def test_api_responses_keep_the_strict_default_csp() -> None:
+    c, _ = client()
+    with c:
+        assert post(c, "안녕").headers["content-security-policy"] == "default-src 'none'"
+        assert c.get("/api/health").headers["content-security-policy"] == "default-src 'none'"
+
+
+def test_page_source_has_no_dangerous_patterns() -> None:
+    """화면 코드 정적 검사: 서버 응답·데이터 속 문장이 HTML·코드로 해석될 길을 막는다."""
+    script = re.search(r"<script>(.*?)</script>", HTML, re.DOTALL).group(1)  # type: ignore[union-attr]
+    for bad in (
+        "innerHTML",
+        "outerHTML",
+        "insertAdjacentHTML",
+        "document.write",
+        "eval(",
+        "new Function",
+        'setAttribute("style"',
+        "javascript:",
+    ):
+        assert bad not in script, bad
+    assert not re.search(r"\son[a-z]+\s*=", HTML)  # onclick= 같은 인라인 핸들러 없음
+    assert 'style="' not in HTML  # 인라인 style 속성은 CSP에 막힌다
+    assert "<script src" not in HTML
+    assert "http://" not in HTML.replace("https?://", "")  # 외부 자원을 부르지 않는다(링크 검사 정규식 제외)
+    assert "https://cdn" not in HTML
+    assert "textContent" in script
+
+
+def test_page_states_unofficial_and_has_the_five_example_buttons() -> None:
+    assert "비공식" in HTML
+    assert "질문 원문은 저장하지 않아요" in HTML
+    examples = re.search(r"var EXAMPLES = \[(.*?)\];", HTML, re.DOTALL).group(1)  # type: ignore[union-attr]
+    assert examples.count('["') == 5  # 기획서의 다섯 갈래
+    for lane in ("역사", "시설·이용", "소식", "기관 정보", "데이터"):
+        assert f'"{lane}"' in examples
+    assert 'maxlength="200"' in HTML
+
+
+def test_links_are_limited_to_http_and_https() -> None:
+    script = re.search(r"<script>(.*?)</script>", HTML, re.DOTALL).group(1)  # type: ignore[union-attr]
+    assert "/^https?:\\/\\//i" in script  # safeLink가 http(s)만 링크로 만든다
+    assert 'a.rel = "noopener noreferrer"' in script

@@ -10,16 +10,19 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import hashlib
 import json
 import logging
 import os
+import re
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel, Field
 
 from app.chaesan.core import guard
@@ -38,6 +41,7 @@ from app.ratelimit import RateLimitMiddleware
 
 logger = logging.getLogger(__name__)
 ASK_PATH = "/api/chaesan/ask"
+INDEX_PATH = Path(__file__).parent / "static" / "index.html"
 ASK_LIMIT_PER_MINUTE = 10  # 질문 한 번에 LLM을 최대 3번 부르므로 축제 앱의 일반 한도보다 엄격하게
 MAX_RUNNING = 2  # 동시에 처리하는 질문 수(로컬 LLM 한 대가 감당할 수준)
 MAX_WAITING = 4  # 처리 순서를 기다리는 질문 수. 넘치면 기다리게 하지 않고 바로 503
@@ -65,6 +69,22 @@ class Gate:
             yield
         finally:
             self._slots.release()
+
+
+def page_csp(html: str) -> str:
+    """화면(index.html)용 CSP. 인라인 <script>·<style>은 내용의 SHA-256 해시로만 허용한다('unsafe-inline' 없음):
+    페이지에 다른 스크립트가 끼어들면(주입) 해시가 달라 실행되지 않는다. 서버 응답과의 통신은 같은 출처로만 허용한다."""
+
+    def digest(tag: str) -> str:
+        m = re.search(rf"<{tag}>(.*?)</{tag}>", html, re.DOTALL)
+        if m is None:
+            raise ValueError(f"index.html에 <{tag}>가 없다")
+        return "'sha256-" + base64.b64encode(hashlib.sha256(m.group(1).encode("utf-8")).digest()).decode() + "'"
+
+    return (
+        f"default-src 'none'; script-src {digest('script')}; style-src {digest('style')}; connect-src 'self'; "
+        "base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+    )
 
 
 class AskIn(BaseModel):
@@ -119,12 +139,19 @@ def create_app(engine: Engine | None = None, *, rate_limit: bool | None = None, 
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "no-referrer"
-        response.headers["Content-Security-Policy"] = "default-src 'none'"
+        response.headers.setdefault("Content-Security-Policy", "default-src 'none'")  # 화면 경로는 자기 CSP를 먼저 넣는다
         response.headers["Cache-Control"] = "no-store"
         return response
 
     app.add_middleware(ChaesanRateLimit, enabled=enabled)
     app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=["GET", "POST"], allow_headers=["content-type"])
+
+    index_html = INDEX_PATH.read_text(encoding="utf-8")  # 시작할 때 읽어, 파일이 없거나 <script>가 없으면 바로 멈춘다
+    index_headers = {"Content-Security-Policy": page_csp(index_html)}
+
+    @app.get("/", include_in_schema=False)
+    async def index() -> HTMLResponse:
+        return HTMLResponse(index_html, headers=index_headers)
 
     @app.get("/api/health")
     async def health() -> dict[str, str]:
