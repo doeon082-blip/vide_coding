@@ -381,6 +381,25 @@ def test_lanes_match_the_server_intents() -> None:
         assert f".lane-{key} {{" in css and (WEB / "img" / f"lane-{key}.svg").is_file()
 
 
+def test_privacy_page_matches_what_the_server_really_records() -> None:
+    """개인정보 안내가 실제 동작과 어긋나면 안 된다: 보관 기간·기록 항목·국외 이전·입력 금지 안내를 코드 값과 맞춰 본다."""
+    from app.chaesan.local.usage_log import ALLOWED_EXTRA, USAGE_LOG_DAYS
+
+    page = (WEB / "privacy.html").read_text(encoding="utf-8")
+    assert f"{USAGE_LOG_DAYS}일" in page  # 로그 보관 기간
+    for must in ("질문과 답변의 글은 저장하지 않아요", "IP 주소 원문", "Cloudflare Workers AI", "입력하지 마세요", "비공식"):
+        assert must in page, must
+    assert "<script" not in page and "http://" not in page and "https://" not in page  # 스크립트·외부 요청 없음
+    assert "privacy.html" in HTML  # 메인 화면에서 닿을 수 있다
+    assert (
+        not {"question", "answer", "text"} & ALLOWED_EXTRA
+    )  # 안내가 약속한 '글은 저장하지 않음'을 기록 허용 목록이 어기지 않는다
+    c, _ = client()
+    with c:
+        r = c.get("/privacy.html")
+    assert r.status_code == 200 and "script-src 'self'" in r.headers["content-security-policy"]
+
+
 def test_web_size_budget() -> None:
     """첫 화면 전송량 목표(100KB 이하)의 원본 합계. 압축 전 기준이라 여유가 있어야 한다."""
     total = sum(p.stat().st_size for p in WEB.rglob("*") if p.is_file() and p.suffix in {".html", ".css", ".js", ".svg"})
