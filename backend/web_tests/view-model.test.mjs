@@ -97,3 +97,67 @@ test("실패 카드: 종류별 문구, 서버 문장은 차단·혼잡·서버 �
   assert.ok(failureViewModel("unexpected-kind").answer.includes("답을 만들 수 없어요"));
   assert.ok(failureViewModel("offline").answer.includes("예시 질문"));
 });
+
+import { CHART_MAX_ROWS, chartOf, defaultView, followUps } from "../app/chaesan/web/js/view-model.js";
+
+const hourly = (n) => Array.from({ length: n }, (_, i) => ({ hour: i, users: (i + 1) * 100 }));
+
+test("갈래는 서버 meta.intent에서 온다(모르는 값은 null)", () => {
+  assert.equal(toViewModel({ ...base, meta: { intent: "data" } }).lane, "data");
+  assert.equal(toViewModel({ ...base, meta: { intent: "unknown" } }).lane, null);
+  assert.equal(toViewModel({ ...base, meta: "x" }).lane, null);
+  assert.equal(toViewModel(base).lane, null);
+});
+
+test("막대 그래프: 3~24행, 숫자 열이 있을 때만. 길이는 값/최댓값, 가장 큰 값 표시", () => {
+  const t = toViewModel({ ...base, evidence_rows: hourly(4) }).table;
+  assert.equal(t.chart.valueColumn, "users");
+  assert.equal(t.chart.labelColumn, "hour");
+  assert.deepEqual(t.chart.bars.map((b) => b.share), [0.25, 0.5, 0.75, 1]);
+  assert.deepEqual(t.chart.bars.map((b) => b.top), [false, false, false, true]);
+  assert.equal(t.chart.bars[3].label, "3");
+  assert.equal(t.chart.bars[3].text, "400"); // 표와 같은 서식(1만 미만은 쉼표 없음)
+  assert.equal(toViewModel({ ...base, evidence_rows: hourly(2) }).table.chart, null); // 너무 적음
+  assert.equal(toViewModel({ ...base, evidence_rows: hourly(CHART_MAX_ROWS + 1) }).table.chart, null); // 너무 많음
+  assert.notEqual(toViewModel({ ...base, evidence_rows: hourly(CHART_MAX_ROWS) }).table.chart, null);
+});
+
+test("막대 그래프를 그리지 않는 경우: 열 1개, 문자만 있는 표, 음수, 전부 0", () => {
+  const rows = (f) => Array.from({ length: 4 }, (_, i) => f(i));
+  assert.equal(toViewModel({ ...base, evidence_rows: rows((i) => ({ n: i + 1 })) }).table.chart, null);
+  assert.equal(toViewModel({ ...base, evidence_rows: rows((i) => ({ a: "x", b: "y" + i })) }).table.chart, null);
+  assert.equal(toViewModel({ ...base, evidence_rows: rows((i) => ({ a: i - 1, b: i - 2 })) }).table.chart, null); // 음수가 있는 열은 값 열이 못 된다
+  assert.equal(toViewModel({ ...base, evidence_rows: rows(() => ({ a: "x", b: 0 })) }).table.chart, null);
+  assert.equal(toViewModel({ ...base, evidence_rows: rows((i) => ({ a: "x", b: i === 1 ? null : 5 })) }).table.chart, null); // 빈 칸이 있으면 숫자 열이 아님
+});
+
+test("이름 칸은 값 열을 뺀 앞의 두 열을 합친다", () => {
+  const rows = Array.from({ length: 3 }, (_, i) => ({ year: 2024, month: i + 1, place: "p", count: 10 * (i + 1) }));
+  const c = toViewModel({ ...base, evidence_rows: rows }).table.chart;
+  assert.equal(c.labelColumn, "year · month");
+  assert.equal(c.bars[0].label, "2024 · 1");
+});
+
+test("처음 보기는 그래프(가능하면) 아니면 표", () => {
+  assert.equal(defaultView(toViewModel({ ...base, evidence_rows: hourly(5) })), "chart");
+  assert.equal(defaultView(toViewModel({ ...base, evidence_rows: [{ a: 1 }] })), "table");
+  assert.equal(defaultView(toViewModel(base)), "table");
+});
+
+test("chartOf는 서버 값을 바꾸지 않는다(원본 숫자는 그대로, 길이만 비율)", () => {
+  const raw = [[1, 215528], [2, 107764], [3, 0]];
+  const cells = raw.map((r) => r.map((v) => ({ text: String(v), numeric: true })));
+  const c = chartOf(["h", "u"], raw, cells);
+  assert.deepEqual(c.bars.map((b) => b.share), [1, 0.5, 0]);
+});
+
+const ex = (lane, question) => ({ lane, question });
+test("이어서 묻기: 이미 한 질문은 빼고 다른 갈래를 먼저 고른다", () => {
+  const all = [ex("데이터", "d1"), ex("데이터", "d2"), ex("역사", "h1"), ex("소식", "n1"), ex("기관 정보", "o1")];
+  const picked = followUps(all, ["h1"], "history");
+  assert.equal(picked.length, 3);
+  assert.deepEqual(picked.map((p) => p.question), ["d1", "n1", "o1"]);
+  assert.ok(!picked.some((p) => p.question === "h1"));
+  assert.deepEqual(followUps(all, all.map((e) => e.question), null), []);
+  assert.deepEqual(followUps([ex("데이터", "d1"), ex("데이터", "d2")], [], "data").map((p) => p.question), ["d1", "d2"]); // 같은 갈래뿐이면 채워 넣는다
+});

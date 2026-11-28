@@ -7,9 +7,33 @@ import { safeUrl } from "./safe-url.js";
 const BLOCKED_ATTR = /^(on|style$|srcdoc$|formaction$)/i;
 const URL_ATTR = /^(href|src|action|xlink:href)$/i;
 
+// 화면이 직접 가진 그림 파일(img/ 폴더의 svg·png)은 주소 검사 없이 src로 쓸 수 있다. 경로 이탈(..)·외부 주소는 이 모양에 맞지 않는다.
+const LOCAL_ASSET = /^img\/[a-z0-9-]+\.(svg|png)$/;
+
+/** 내부 그림 경로('img/mark.svg')인가. 시험하려고 따로 내보낸다. */
+export function isLocalAsset(value) {
+  return typeof value === "string" && LOCAL_ASSET.test(value);
+}
+
 /** 속성 이름이 안전한가(글자·숫자·_-: 만, 이벤트·style 제외). 시험하려고 따로 내보낸다. */
 export function isSafeAttr(name) {
   return typeof name === "string" && /^[a-zA-Z][\w:-]*$/.test(name) && !BLOCKED_ATTR.test(name);
+}
+
+const SVG_NS = "http://www.w3.org/2000/svg";
+const SVG_TAGS = new Set(["svg", "g", "rect", "path", "circle"]);
+
+/** SVG 요소 만들기(막대 그래프용). 허용한 태그·속성만 쓴다. 숫자 속성(width·x 등)은 화면 배치용 값이다. */
+export function svgEl(tag, props = {}, ...children) {
+  if (!SVG_TAGS.has(tag)) throw new Error(`허용하지 않는 SVG 태그: ${tag}`);
+  const node = document.createElementNS(SVG_NS, tag);
+  for (const [key, value] of Object.entries(props ?? {})) {
+    if (value === undefined || value === null || value === false) continue;
+    if (!isSafeAttr(key) || URL_ATTR.test(key)) throw new Error(`허용하지 않는 속성: ${key}`);
+    node.setAttribute(key, String(value));
+  }
+  for (const child of children.flat()) if (child) node.append(child);
+  return node;
 }
 
 /**
@@ -27,6 +51,8 @@ export function el(tag, props = {}, ...children) {
       node.className = String(value);
     } else if (!isSafeAttr(key)) {
       throw new Error(`허용하지 않는 속성: ${key}`);
+    } else if (key.toLowerCase() === "src" && isLocalAsset(String(value))) {
+      node.setAttribute(key, String(value)); // 화면 안의 그림 파일
     } else if (URL_ATTR.test(key)) {
       const safe = safeUrl(String(value));
       if (safe === null) throw new Error("허용하지 않는 주소");

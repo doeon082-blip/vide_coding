@@ -235,10 +235,20 @@ def test_every_page_asset_is_served_with_a_usable_type() -> None:
     c, _ = client()
     with c:
         assert c.get("/js/main.js").headers["content-type"].split(";")[0] in ("text/javascript", "application/javascript")
-        assert c.get("/css/style.css").headers["content-type"].startswith("text/css")
+        for sheet in ("base", "layout", "card"):
+            assert c.get(f"/css/{sheet}.css").headers["content-type"].startswith("text/css")
+        assert c.get("/img/hero-light.svg").headers["content-type"].startswith("image/svg+xml")
         assert c.get("/data/examples.json").json()["examples"]
         assert c.get("/favicon.svg").status_code == 200
-        for path in ("/js/render.js", "/js/state.js", "/js/api.js", "/js/view-model.js", "/js/components.js", "/js/lib/dom.js"):
+        for path in (
+            "/js/render.js",
+            "/js/state.js",
+            "/js/api.js",
+            "/js/view-model.js",
+            "/js/components.js",
+            "/js/lib/dom.js",
+            "/js/lib/lane.js",
+        ):
             assert c.get(path).status_code == 200, path
 
 
@@ -294,7 +304,8 @@ def test_page_source_has_no_dangerous_patterns() -> None:
             "import(",
         ):
             assert bad not in code, f"{path.name}: {bad}"
-        assert not re.search(r"https?://", code.replace("https:", "", 1) if path.name == "safe-url.js" else code), path.name
+        code = code.replace("http://www.w3.org/2000/svg", "")  # SVG 이름공간 표기(주소 호출이 아님)
+        assert not re.search(r"https?://", code), path.name
     assert not re.search(r"\son[a-z]+\s*=", HTML)  # onclick= 같은 인라인 핸들러 없음
     assert "style=" not in HTML and "<style" not in HTML  # 인라인 스타일은 CSP에 막힌다
     assert not re.search(r"<script(?![^>]*\bsrc=)", HTML)  # 인라인 스크립트 없음(src 있는 것만)
@@ -312,6 +323,30 @@ def test_page_has_no_external_hosts_in_any_web_file() -> None:
             assert "@import" not in body, path.name
 
 
+def test_every_referenced_asset_exists() -> None:
+    """HTML·CSS가 가리키는 파일이 실제로 있다(경로 오타로 아이콘·그림이 깨지는 것을 막는다)."""
+    refs = re.findall(r'(?:src|href|srcset)="([^"#]+)"', HTML)
+    for css in (WEB / "css").glob("*.css"):
+        refs += [f"css/../{u}" for u in re.findall(r'url\("\.\./([^"]+)"\)', css.read_text(encoding="utf-8"))]
+    assert len(refs) >= 10
+    for ref in refs:
+        if ref.startswith(("#", "./")) and ref == "./":
+            continue
+        assert (WEB / ref.replace("css/../", "")).is_file(), ref
+
+
+def test_lanes_match_the_server_intents() -> None:
+    """화면의 갈래 이름이 서버 planner.INTENTS(unknown 제외)와 같다."""
+    from app.chaesan.core.planner import INTENTS
+
+    lane_js = (WEB / "js" / "lib" / "lane.js").read_text(encoding="utf-8")
+    keys = re.findall(r"^  (\w+): \{ label", lane_js, re.MULTILINE)
+    assert set(keys) == set(INTENTS) - {"unknown"}
+    css = (WEB / "css" / "base.css").read_text(encoding="utf-8")
+    for key in keys:
+        assert f".lane-{key} {{" in css and (WEB / "img" / f"lane-{key}.svg").is_file()
+
+
 def test_web_size_budget() -> None:
     """첫 화면 전송량 목표(100KB 이하)의 원본 합계. 압축 전 기준이라 여유가 있어야 한다."""
     total = sum(p.stat().st_size for p in WEB.rglob("*") if p.is_file() and p.suffix in {".html", ".css", ".js", ".svg"})
@@ -320,7 +355,8 @@ def test_web_size_budget() -> None:
 
 def test_page_states_unofficial_and_has_the_five_example_buttons() -> None:
     assert "비공식" in HTML
-    assert "질문 원문은 저장하지 않아요" in HTML
+    assert "질문은 저장하지 않아요" in HTML
+    assert "각 질문은 따로 답해요" in HTML  # 앞선 대화를 기억하는 것처럼 보이지 않게 밝힌다(엔진은 질문마다 독립)
     assert 'maxlength="200"' in HTML
     assert 'aria-live="polite"' in HTML
     examples = json.loads((WEB / "data" / "examples.json").read_text(encoding="utf-8"))["examples"]

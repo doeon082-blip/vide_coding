@@ -14,3 +14,13 @@ test("일반 속성과 aria-·data- 속성은 허용", () => {
     assert.equal(isSafeAttr(ok), true, ok);
   }
 });
+
+import { isLocalAsset } from "../app/chaesan/web/js/lib/dom.js";
+
+test("내부 그림 경로는 img/ 아래 svg·png만, 외부·이탈·스크립트 주소는 거부", () => {
+  assert.equal(isLocalAsset("img/mark.svg"), true);
+  assert.equal(isLocalAsset("img/lane-data.svg"), true);
+  for (const bad of ["../img/mark.svg", "img/../secret.svg", "/img/mark.svg", "img/mark.svg?x=1", "img/mark.js", "img/MARK.svg", "https://evil.example/a.svg", "javascript:alert(1)", "data:image/svg+xml,<svg/>", "img//mark.svg", "", null, 5]) {
+    assert.equal(isLocalAsset(bad), false, String(bad));
+  }
+});
