@@ -143,6 +143,11 @@ export function toViewModel(data) {
   });
 }
 
+export const LONG_ANSWER = 140;
+
+/** 근거 표·그래프가 따로 있는데 한 줄 답이 숫자 나열처럼 길면 처음에는 줄여 보인다('전체 보기'로 펼침). */
+export const isLongAnswer = (vm) => vm.answer !== null && vm.table !== null && vm.answer.length > LONG_ANSWER;
+
 /** 처음 보여 줄 근거 보기: 그래프를 그릴 수 있으면 그래프, 아니면 표. */
 export const defaultView = (vm) => (vm.table?.chart ? "chart" : "table");
 
