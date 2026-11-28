@@ -1,16 +1,14 @@
 [project]
-name = "festival-backend"
+name = "chaesan-backend"
 version = "0.1.0"
-description = "Festival info + local AI curation backend"
+description = "채산(비공식) - 한체산 공개 데이터 길라잡이 서버"
 authors = [
     { name = "귀염뽀작도언이" }
 ]
 requires-python = ">=3.12"
 dependencies = [
-    "chromadb>=1.5.9",
     "fastapi>=0.165.0",
     "httpx>=0.28.1",
-    "python-dotenv>=1.2.4",
     "uvicorn>=0.54.0",
 ]
 
@@ -25,7 +23,6 @@ dev = [
 pythonpath = ["."]
 testpaths = ["tests"]
 
-# 채산 코드(app/chaesan, tests/test_chaesan_*)만 검사한다. 기존 축제 앱 코드는 규칙 5에 따라 건드리지 않는다.
 [tool.ruff]
 line-length = 130
 target-version = "py312"
@@ -52,8 +49,3 @@ python_version = "3.12"
 files = ["app/chaesan"]
 strict = true
 warn_unreachable = true
-
-# 기존 축제 앱의 요청 제한 모듈은 가져다 쓰기만 한다(규칙 5). 그 안의 타입 경고는 채산 검사 대상이 아니다.
-[[tool.mypy.overrides]]
-module = ["app.ratelimit"]
-follow_imports = "silent"
