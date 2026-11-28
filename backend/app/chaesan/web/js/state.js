@@ -20,7 +20,7 @@ export const setStep = (s, step) => (s.phase === "loading" ? { ...s, step } : s)
 
 /** 답(또는 실패 카드)을 대화에 더한다. source: { kind: "live" } | { kind: "example", generatedAt } | null */
 export const addAnswer = (s, vm, source = null) => ({
-  ...append(s, { role: "bot", vm, source, expanded: false, view: defaultView(vm) }),
+  ...append(s, { role: "bot", vm, source, expanded: false, answerOpen: false, view: defaultView(vm) }),
   phase: "idle",
   step: 0,
 });
@@ -28,6 +28,8 @@ export const addAnswer = (s, vm, source = null) => ({
 const patch = (s, id, change) => ({ ...s, messages: s.messages.map((m) => (m.id === id && m.role === "bot" ? { ...m, ...change(m) } : m)) });
 
 export const toggleRows = (s, id) => patch(s, id, (m) => ({ expanded: !m.expanded }));
+
+export const toggleAnswer = (s, id) => patch(s, id, (m) => ({ answerOpen: !m.answerOpen }));
 
 export const setView = (s, id, view) => patch(s, id, () => ({ view: view === "table" ? "table" : "chart" }));
 
