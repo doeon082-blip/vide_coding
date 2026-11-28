@@ -3,6 +3,7 @@
 
 import { el, svgEl } from "./lib/dom.js";
 import { laneClass, laneKeyByLabel, laneLabel } from "./lib/lane.js";
+import { isLongAnswer } from "./view-model.js";
 
 export const STEPS = Object.freeze(["자료 찾는 중", "계산 중", "설명 쓰는 중"]);
 export const FOOT_LINE = "비공식 서비스 · 답은 틀릴 수 있어요";
@@ -156,6 +157,18 @@ function copyButton(answer, canCopy, onCopy) {
   return button;
 }
 
+/** 한 줄 답. 근거 표·그래프가 따로 있는데 답이 길면(숫자 나열) 3줄까지만 보이고 '전체 보기'로 펼친다. */
+function answerBlock(message, handlers) {
+  const { vm } = message;
+  if (vm.answer === null) return null;
+  const clamp = isLongAnswer(vm) && !message.answerOpen;
+  const paragraph = el("p", { class: clamp ? "answer is-clamped" : "answer", text: vm.answer });
+  if (!isLongAnswer(vm)) return paragraph;
+  const toggle = el("button", { type: "button", class: "btn-link", "aria-expanded": clamp ? "false" : "true", text: clamp ? "답 전체 보기" : "답 줄이기" });
+  toggle.addEventListener("click", () => handlers.onToggleAnswer(message.id));
+  return el("div", { class: "answer-block" }, paragraph, toggle);
+}
+
 /** 답변 카드(성공·모름·되묻기·미연결·실패 모두 같은 모양). 갈래별 색과 아이콘이 입혀진다. */
 export function botMessage(message, handlers, canCopy) {
   const { vm, source } = message;
@@ -172,7 +185,7 @@ export function botMessage(message, handlers, canCopy) {
       source?.kind === "example" ? el("p", { class: "example-mark", text: source.generatedAt ? `미리 계산한 답 · ${source.generatedAt} 기준` : "미리 계산한 답" }) : null,
       vm.corrections.map((c) => el("p", { class: "correction", text: `✎ ${c}` })),
       vm.numberNotice ? el("p", { class: "number-notice", text: vm.numberNotice }) : null,
-      vm.answer !== null ? el("p", { class: "answer", text: vm.answer }) : null,
+      answerBlock(message, handlers),
       badges(vm.badges),
       evidence(message, handlers),
       documentList(vm.documents),
