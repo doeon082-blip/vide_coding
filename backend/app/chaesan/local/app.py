@@ -36,7 +36,7 @@ from app.chaesan.ingest.load import BACKEND_DIR, DB_PATH
 from app.chaesan.local.clock import SystemClock
 from app.chaesan.local.db import SqliteDB
 from app.chaesan.local.demand import JsonlDemandSink
-from app.chaesan.local.limits import DailyBudget
+from app.chaesan.local.limits import DailyBudget, estimate_neurons
 from app.chaesan.local.llm import make_llm
 from app.chaesan.local.ratelimit import MAX_BODY_BYTES, RateLimitMiddleware, client_ip
 from app.chaesan.local.usage_log import FileUsageLog, Pseudonymizer, UsageSink, build_event
@@ -56,7 +56,7 @@ ASK_LIMIT_PER_MINUTE = 10  # 질문 한 번에 LLM을 최대 3번 부르므로 �
 MAX_RUNNING = 2  # 동시에 처리하는 질문 수(로컬 LLM 한 대가 감당할 수준)
 MAX_WAITING = 4  # 처리 순서를 기다리는 질문 수. 넘치면 기다리게 하지 않고 바로 503
 MSG_BUSY = "지금은 질문이 많아요. 잠시 후 다시 물어봐 주세요."
-MSG_DAILY_LIMIT = "오늘 받을 수 있는 질문을 모두 썼어요. 내일 다시 물어봐 주세요. 예시 질문은 계속 볼 수 있어요."
+MSG_DAILY_LIMIT = "오늘 쓸 수 있는 AI 사용량을 모두 썼어요. 내일 다시 물어봐 주세요. 예시 질문은 계속 볼 수 있어요."
 
 
 class Gate:
@@ -223,8 +223,7 @@ def create_app(
             raise HTTPException(status_code=429, detail=MSG_DAILY_LIMIT)
         async with limiter.enter():
             card = await request.app.state.engine.ask(body.question)
-        if card.meta.get("llm_calls"):
-            daily.charge(ip)
+        daily.charge(ip, estimate_neurons(int(card.meta.get("input_tokens") or 0), int(card.meta.get("output_tokens") or 0)))
         # 처리 결과 요약만 남긴다(질문·답변 글자는 싣지 않는다). 사용 기록 미들웨어가 요청 기록에 합쳐 쓴다.
         now = datetime.now(KST)
         request.state.usage = {
