@@ -303,7 +303,9 @@ def test_only_the_web_folder_is_exposed() -> None:
             assert r.status_code in (400, 404), path
             assert "class Engine" not in r.text
         assert c.get("/js/").status_code == 404  # 폴더 목록을 보여 주지 않는다
-        assert c.get("/package.json").status_code == 200  # 의존성 없는 표시용 파일이라 공개돼도 된다
+        # 저장소에는 있어도 웹으로는 내보내지 않는 파일(허용 목록 밖): 시험·설정·문서·점 파일
+        for hidden in ("/package.json", "/README.md", "/.gitignore", "/tests/api.test.mjs", "/tests/", "/css/../README.md"):
+            assert c.get(hidden).status_code == 404, hidden
     assert not list(WEB.rglob(".env*")) and not list(WEB.rglob("*.sqlite"))
 
 
