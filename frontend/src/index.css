@@ -1,8 +1,0 @@
-@import "tailwindcss";
-@plugin "daisyui" {
-  themes: cupcake --default, dracula --prefersdark;
-}
-
-html {
-  scroll-behavior: smooth;
-}
