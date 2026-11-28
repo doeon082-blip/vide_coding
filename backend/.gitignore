@@ -4,6 +4,8 @@
 .env.*
 !.env.example
 data/
+# 화면의 예시 답(공개 가능한 산출물)은 올린다. 원본 데이터·DB 폴더(backend/data/)만 막는다.
+!app/chaesan/web/data/
 *.sqlite
 *.sqlite3
 *.db
