@@ -23,7 +23,7 @@ from typing import Final
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from app.chaesan.core import guard
 from app.chaesan.core.catalog import load_catalog
@@ -38,7 +38,7 @@ from app.chaesan.local.db import SqliteDB
 from app.chaesan.local.demand import JsonlDemandSink
 from app.chaesan.local.limits import DailyBudget
 from app.chaesan.local.llm import make_llm
-from app.chaesan.local.ratelimit import RateLimitMiddleware, client_ip
+from app.chaesan.local.ratelimit import MAX_BODY_BYTES, RateLimitMiddleware, client_ip
 from app.chaesan.local.usage_log import FileUsageLog, Pseudonymizer, UsageSink, build_event
 
 logger = logging.getLogger(__name__)
@@ -84,6 +84,27 @@ class Gate:
 
 class AskIn(BaseModel):
     question: str = Field(min_length=1, max_length=MAX_QUESTION_LEN)
+
+
+async def read_question(request: Request) -> AskIn:
+    """요청 본문을 **읽는 도중에** 크기를 제한하며 읽고 검사한다.
+
+    왜: 요청 제한 미들웨어는 Content-Length 헤더만 보므로, 헤더 없이 조각(chunked)으로 큰 본문을 보내면 서버가 끝까지 읽어
+    메모리를 쓴다. 질문 하나는 짧으니 MAX_BODY_BYTES를 넘는 순간 읽기를 멈추고 413으로 끊는다.
+    """
+    if "application/json" not in request.headers.get("content-type", ""):
+        raise HTTPException(status_code=415, detail="JSON 형식으로 보내 주세요.")
+    chunks: list[bytes] = []
+    total = 0
+    async for chunk in request.stream():
+        total += len(chunk)
+        if total > MAX_BODY_BYTES:
+            raise HTTPException(status_code=413, detail="요청 본문이 너무 큽니다.")
+        chunks.append(chunk)
+    try:
+        return AskIn.model_validate_json(b"".join(chunks))
+    except ValidationError as exc:  # 검증 상세(내부 필드 이름 등)는 돌려주지 않고 일반 문장만
+        raise HTTPException(status_code=422, detail=f"질문은 1자 이상 {MAX_QUESTION_LEN}자 이하로 써 주세요.") from exc
 
 
 class ChaesanRateLimit(RateLimitMiddleware):
@@ -194,7 +215,8 @@ def create_app(
         return {"status": "ok"}
 
     @app.post(ASK_PATH)
-    async def ask(body: AskIn, request: Request) -> JSONResponse:
+    async def ask(request: Request) -> JSONResponse:
+        body = await read_question(request)
         ip = client_ip(request)
         if daily.check(ip) is not None:  # AI를 부르기 전에 막는다(예산을 쓰지 않는다)
             request.state.usage = {"q_len": len(body.question), "result": "daily_limit"}
