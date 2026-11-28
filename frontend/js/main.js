@@ -36,6 +36,7 @@ const handlers = {
   onToggleAnswer: (id) => store.update((s) => toggleAnswer(s, id)),
   onView: (id, view) => store.update((s) => setView(s, id, view)),
   onPick: (example) => pickExample(example),
+  onRetry: (id) => retry(id),
   onCopy: copyAnswer,
 };
 
@@ -79,6 +80,14 @@ function pickExample(example) {
   } else {
     ask(example.question);
   }
+}
+
+/** 실패한 답 바로 앞의 내 질문을 다시 보낸다(질문 글자는 이 페이지의 메모리에 있는 것을 그대로 쓴다). */
+function retry(id) {
+  const messages = store.get().messages;
+  const at = messages.findIndex((m) => m.id === id);
+  const question = messages.slice(0, Math.max(at, 0)).reverse().find((m) => m.role === "user");
+  if (question) ask(question.text);
 }
 
 newChat.addEventListener("click", () => {
