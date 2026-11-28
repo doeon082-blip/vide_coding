@@ -110,3 +110,51 @@ def test_usage_log_files_are_private(tmp_path: Path) -> None:
     mode = lambda p: stat.S_IMODE(p.stat().st_mode)  # noqa: E731
     assert mode(tmp_path / "logs") == 0o700
     assert mode(tmp_path / "logs" / "usage.jsonl") == 0o600  # 소유자만 읽고 쓴다
+
+
+# --------------------------------------------------------------------------- 요청 본문 크기(조각으로 보내는 큰 요청)
+
+
+def test_oversized_chunked_body_is_cut_off_with_413_and_never_reaches_the_llm() -> None:
+    """Content-Length 헤더 없이 조각(chunked)으로 보내는 큰 본문은 헤더 검사로는 못 막는다: 읽는 도중에 끊어야 한다."""
+    llm = FakeLLM(UNKNOWN)
+
+    def pieces() -> Any:
+        for _ in range(100):  # 합계 약 100KB(한도 8KB의 10배 이상)
+            yield b'{"question": "' + b"a" * 1000 if _ == 0 else b"a" * 1000
+
+    with make(DailyBudget(), llm=llm) as c:
+        r = c.post(ASK_PATH, content=pieces(), headers={"content-type": "application/json"})
+    assert r.status_code == 413
+    assert llm.calls == 0
+
+
+def test_body_exactly_at_the_limit_boundary_is_still_validated_normally() -> None:
+    from app.chaesan.local.ratelimit import MAX_BODY_BYTES
+
+    with make(DailyBudget()) as c:
+        small = c.post(ASK_PATH, json={"question": "안녕"})
+        padded = c.post(
+            ASK_PATH, content=b'{"question":"' + b"a" * MAX_BODY_BYTES + b'"}', headers={"content-type": "application/json"}
+        )
+    assert small.status_code == 200
+    assert padded.status_code == 413  # 한도를 넘으면 질문 길이 검사까지 가지도 않는다
+
+
+@pytest.mark.parametrize(
+    "content_type", ["text/plain", "application/x-www-form-urlencoded", "multipart/form-data; boundary=x", ""]
+)
+def test_non_json_content_types_are_rejected(content_type: str) -> None:
+    llm = FakeLLM(UNKNOWN)
+    with make(DailyBudget(), llm=llm) as c:
+        r = c.post(ASK_PATH, content=b'{"question":"hi"}', headers={"content-type": content_type} if content_type else {})
+    assert r.status_code == 415 and llm.calls == 0
+
+
+def test_validation_errors_do_not_leak_internal_field_details() -> None:
+    with make(DailyBudget()) as c:
+        r = c.post(ASK_PATH, json={"question": "가" * 201, "extra": {"__class__": 1}})
+    assert r.status_code == 422
+    assert r.json() == {
+        "detail": "질문은 1자 이상 200자 이하로 써 주세요."
+    }  # pydantic 오류 목록(loc·type·input)을 돌려주지 않는다
