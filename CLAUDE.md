@@ -73,7 +73,11 @@
   - **남은 실패**: dev11(작은 카드의 장소 이름을 후보 설명에서 못 찾아 `answerable=false`로 거절, 3/3회 실패), dev07(모델이 가끔 SQL을 틀리게 써 '1가지'라고 답함, 3회 중 2회). 규칙 ⑦ 완화 A/B는 **채택 기준 미달**(dev11 그대로, 한 번은 근거 없는 질문에 지어낸 답) → 현재 문구 유지.
   - 다음 후보(미적용): 카드에 값이 적은 열의 대표 값을 넣어 계획 LLM이 장소·종목 이름을 후보 설명에서 찾게 한다.
   - 한계: 문항 틀은 내가 만들어 시험용 60문항보다 쉬울 수 있고, 20문항은 1문항이 5%다.
-- 화면(G단계, 2026-11-28): `local/static/index.html` 한 장(질문창·예시 5개·답변 카드·"비공식" 표기), `GET /`로 서빙. 서버가 인라인 `<script>`·`<style>`의 SHA-256 해시로만 허용하는 CSP를 응답 헤더에 넣는다('unsafe-inline' 없음). 화면 코드는 `textContent`만 쓰고 링크는 http(s)만. 정적 검사 테스트가 `innerHTML`·`eval`·인라인 핸들러·외부 자원 호출을 막는다. 예시 버튼은 실제 모델로 잘 답하는 것을 확인한 질문이다(기획서의 '장미축제'·'잔디마당' 예시는 데이터에 그 표현이 없어 '모른다'가 정직한 답이라 쓰지 않음).
+- 화면(G단계·H1~H2, 2026-11-28): `backend/app/chaesan/web/`(빌드 없는 HTML + CSS + 순수 JS ES 모듈, npm·번들러 없음). 로컬(FastAPI `StaticFiles`)과 서비스(Cloudflare 정적 파일)가 같은 폴더를 쓴다. 구조: `index.html` / `css/style.css` / `js/{main,state,api,render,components,view-model}.js` / `js/lib/{dom,safe-url,format}.js` / `data/examples.json`(H4에서 미리 계산한 답을 채움) / `favicon.svg`. 순수 함수(값 정리·링크 검사·서버 호출·상태)는 `web_tests/*.test.mjs`를 `node --test`로 시험하고, pytest(`test_frontend_node_tests_pass`)가 이를 함께 돈다.
+  - 보안: CSP는 `script-src 'self'; style-src 'self'; default-src 'none'`(인라인 코드·외부 자원 없음, 이전 해시 방식 폐기). 글자는 `el()`(textContent)로만, 이벤트·style 속성은 만들 수 없고 href는 `safeUrl`(https + `data.go.kr`·`ksponco.or.kr`·`alio.go.kr`만, 사용자정보 거부)을 통과해야 한다. 허용 도메인은 카드·문서의 실제 주소(data.go.kr 55, ksponco.or.kr 3+981, alio.go.kr 16)를 세어 정했다. 정적 검사 테스트가 `innerHTML`·`eval`·`.style.`·저장소 사용·외부 주소를 막는다.
+  - 서버 응답에 맞춘 점(2026-11-28 프롬프트 2와 다른 부분): status는 서버 값(answered/unknown/clarify/planned/blocked/error), badges·corrections는 문자열 목록, 근거는 `evidence_rows`와 `documents`, 질문 길이 200자, 한도 초과·혼잡은 HTTP 429·503. 숫자 미확인(`unsupported_numbers`)이면 한 줄 답을 숨기고 근거 표만 보인다.
+  - 질문 원문은 상태·저장소에 두지 않는다. `?offline=1`이면 서버를 부르지 않고 예시 답만 보인다(예비 화면). 예시 버튼은 미리 계산한 답이 있으면 서버를 부르지 않는다(H4에서 채움).
+  - 기획서의 '장미축제'·'잔디마당' 예시는 데이터에 그 표현이 없어 '모른다'가 정직한 답이라 예시 버튼에 쓰지 않았다.
 - 벡터 검색, "나중" API 수집, 개방 수요 리포트 화면, 영어 답변은 이번에 만들지 않는다. 개방 수요는 주제 요약만 기록하고 질문 원문은 저장하지 않는다.
 
 ## 단계

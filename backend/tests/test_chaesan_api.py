@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import base64
-import hashlib
 import json
 import re
 from datetime import datetime
@@ -156,7 +154,9 @@ def test_cors_only_for_allowed_origin() -> None:
 def test_get_is_not_allowed_on_ask() -> None:
     c, _ = client()
     with c:
-        assert c.get(ASK_PATH).status_code == 405
+        r = c.get(ASK_PATH)
+        assert r.status_code == 405 and r.headers["allow"] == "POST"
+        assert c.delete(ASK_PATH).status_code == 405
 
 
 def test_concurrency_gate_rejects_overflow_without_queueing_forever() -> None:
@@ -204,12 +204,14 @@ def test_build_engine_can_turn_demand_recording_off(tmp_path: Any) -> None:
     assert build_engine()._sink is not None
 
 
-# --------------------------------------------------------------------------- 화면(GET /)
+# --------------------------------------------------------------------------- 화면(web/ 폴더, GET /)
 
-HTML = (Path(__file__).resolve().parents[1] / "app" / "chaesan" / "local" / "static" / "index.html").read_text(encoding="utf-8")
+WEB = Path(__file__).resolve().parents[1] / "app" / "chaesan" / "web"
+HTML = (WEB / "index.html").read_text(encoding="utf-8")
+JS_FILES = sorted((WEB / "js").rglob("*.js"))
 
 
-def test_page_is_served_with_hash_only_csp() -> None:
+def test_page_is_served_with_self_only_csp() -> None:
     c, _ = client()
     with c:
         r = c.get("/")
@@ -218,16 +220,47 @@ def test_page_is_served_with_hash_only_csp() -> None:
     csp = r.headers["content-security-policy"]
     assert "'unsafe-inline'" not in csp
     assert "'unsafe-eval'" not in csp
+    assert "script-src 'self'" in csp
+    assert "style-src 'self'" in csp
     assert "default-src 'none'" in csp
     assert "connect-src 'self'" in csp
     assert "frame-ancestors 'none'" in csp
-    # 헤더의 해시가 실제 인라인 코드의 해시와 같아야 브라우저가 실행한다
-    for tag in ("script", "style"):
-        body = re.search(rf"<{tag}>(.*?)</{tag}>", r.text, re.DOTALL).group(1)  # type: ignore[union-attr]
-        digest = base64.b64encode(hashlib.sha256(body.encode("utf-8")).digest()).decode()
-        assert f"'sha256-{digest}'" in csp
+    assert "http" not in csp  # 외부 주소를 허용하지 않는다
     assert r.headers["x-content-type-options"] == "nosniff"
     assert r.headers["cache-control"] == "no-store"
+
+
+def test_every_page_asset_is_served_with_a_usable_type() -> None:
+    """index.html이 부르는 파일이 실제로 있고, 브라우저가 모듈로 실행할 수 있는 종류로 나가야 한다."""
+    c, _ = client()
+    with c:
+        assert c.get("/js/main.js").headers["content-type"].split(";")[0] in ("text/javascript", "application/javascript")
+        assert c.get("/css/style.css").headers["content-type"].startswith("text/css")
+        assert c.get("/data/examples.json").json()["examples"]
+        assert c.get("/favicon.svg").status_code == 200
+        for path in ("/js/render.js", "/js/state.js", "/js/api.js", "/js/view-model.js", "/js/components.js", "/js/lib/dom.js"):
+            assert c.get(path).status_code == 200, path
+
+
+def test_only_the_web_folder_is_exposed() -> None:
+    """화면 폴더 밖(코드·데이터·비밀 파일)은 어떤 경로로도 내려가지 않는다."""
+    c, _ = client()
+    with c:
+        attempts = (
+            "/../core/engine.py",
+            "/%2e%2e/core/engine.py",
+            "/..%2fcore/engine.py",
+            "/js/../../core/engine.py",
+            "/../../.env",
+            "/%2e%2e/%2e%2e/.env",
+        )
+        for path in attempts:
+            r = c.get(path)
+            assert r.status_code in (400, 404), path
+            assert "class Engine" not in r.text
+        assert c.get("/js/").status_code == 404  # 폴더 목록을 보여 주지 않는다
+        assert c.get("/package.json").status_code == 200  # 의존성 없는 표시용 파일이라 공개돼도 된다
+    assert not list(WEB.rglob(".env*")) and not list(WEB.rglob("*.sqlite"))
 
 
 def test_api_responses_keep_the_strict_default_csp() -> None:
@@ -235,41 +268,98 @@ def test_api_responses_keep_the_strict_default_csp() -> None:
     with c:
         assert post(c, "안녕").headers["content-security-policy"] == "default-src 'none'"
         assert c.get("/api/health").headers["content-security-policy"] == "default-src 'none'"
+        assert c.get("/api/없는경로").status_code == 404
 
 
 def test_page_source_has_no_dangerous_patterns() -> None:
     """화면 코드 정적 검사: 서버 응답·데이터 속 문장이 HTML·코드로 해석될 길을 막는다."""
-    script = re.search(r"<script>(.*?)</script>", HTML, re.DOTALL).group(1)  # type: ignore[union-attr]
-    for bad in (
-        "innerHTML",
-        "outerHTML",
-        "insertAdjacentHTML",
-        "document.write",
-        "eval(",
-        "new Function",
-        'setAttribute("style"',
-        "javascript:",
-    ):
-        assert bad not in script, bad
+    assert JS_FILES, "화면 JS가 없다"
+    for path in JS_FILES:
+        code = re.sub(r"(?m)^\s*//.*$|\s//\s.*$", "", path.read_text(encoding="utf-8"))  # 설명 주석은 검사에서 뺀다(코드만 본다)
+        for bad in (
+            "innerHTML",
+            "outerHTML",
+            "insertAdjacentHTML",
+            "document.write",
+            "eval(",
+            "new Function",
+            'setAttribute("style"',
+            ".style.",
+            "javascript:",
+            "localStorage",
+            "sessionStorage",
+            "indexedDB",
+            "document.cookie",
+            "XMLHttpRequest",
+            "import(",
+        ):
+            assert bad not in code, f"{path.name}: {bad}"
+        assert not re.search(r"https?://", code.replace("https:", "", 1) if path.name == "safe-url.js" else code), path.name
     assert not re.search(r"\son[a-z]+\s*=", HTML)  # onclick= 같은 인라인 핸들러 없음
-    assert 'style="' not in HTML  # 인라인 style 속성은 CSP에 막힌다
-    assert "<script src" not in HTML
-    assert "http://" not in HTML.replace("https?://", "")  # 외부 자원을 부르지 않는다(링크 검사 정규식 제외)
-    assert "https://cdn" not in HTML
-    assert "textContent" in script
+    assert "style=" not in HTML and "<style" not in HTML  # 인라인 스타일은 CSP에 막힌다
+    assert not re.search(r"<script(?![^>]*\bsrc=)", HTML)  # 인라인 스크립트 없음(src 있는 것만)
+    assert "http://" not in HTML and "https://" not in HTML  # 외부 자원을 부르지 않는다
+    assert "textContent" in (WEB / "js" / "lib" / "dom.js").read_text(encoding="utf-8")
+
+
+def test_page_has_no_external_hosts_in_any_web_file() -> None:
+    """HTML·CSS·JSON·SVG까지 외부 서버를 부르는 곳이 없다(방문자 정보가 밖으로 나가지 않고, 외부가 끊겨도 화면이 산다)."""
+    for path in WEB.rglob("*"):
+        if path.is_file() and path.suffix in {".html", ".css", ".json", ".svg"}:
+            body = path.read_text(encoding="utf-8")
+            body = body.replace("http://www.w3.org/2000/svg", "")  # SVG 이름공간 표기는 주소 호출이 아니다
+            assert not re.search(r"(?:src|href|url\()\s*[=(]?\s*[\"']?https?://", body), path.name
+            assert "@import" not in body, path.name
+
+
+def test_web_size_budget() -> None:
+    """첫 화면 전송량 목표(100KB 이하)의 원본 합계. 압축 전 기준이라 여유가 있어야 한다."""
+    total = sum(p.stat().st_size for p in WEB.rglob("*") if p.is_file() and p.suffix in {".html", ".css", ".js", ".svg"})
+    assert total < 100_000, total
 
 
 def test_page_states_unofficial_and_has_the_five_example_buttons() -> None:
     assert "비공식" in HTML
     assert "질문 원문은 저장하지 않아요" in HTML
-    examples = re.search(r"var EXAMPLES = \[(.*?)\];", HTML, re.DOTALL).group(1)  # type: ignore[union-attr]
-    assert examples.count('["') == 5  # 기획서의 다섯 갈래
-    for lane in ("역사", "시설·이용", "소식", "기관 정보", "데이터"):
-        assert f'"{lane}"' in examples
     assert 'maxlength="200"' in HTML
+    assert 'aria-live="polite"' in HTML
+    examples = json.loads((WEB / "data" / "examples.json").read_text(encoding="utf-8"))["examples"]
+    lanes = {e["lane"] for e in examples}
+    assert lanes == {"역사", "시설·이용", "소식", "기관 정보", "데이터"}  # 기획서의 다섯 갈래를 모두 덮는다
+    assert all(e["question"] and len(e["question"]) <= 200 for e in examples)
 
 
-def test_links_are_limited_to_http_and_https() -> None:
-    script = re.search(r"<script>(.*?)</script>", HTML, re.DOTALL).group(1)  # type: ignore[union-attr]
-    assert "/^https?:\\/\\//i" in script  # safeLink가 http(s)만 링크로 만든다
-    assert 'a.rel = "noopener noreferrer"' in script
+def test_frontend_and_backend_agree_on_limits_and_statuses() -> None:
+    """화면 상수가 서버와 어긋나면 시민이 오류를 본다: 질문 길이와 status 목록을 서버 값과 비교한다."""
+    from typing import get_args
+
+    from app.chaesan.core.config import MAX_QUESTION_LEN
+    from app.chaesan.core.engine import Status
+
+    vm = (WEB / "js" / "view-model.js").read_text(encoding="utf-8")
+    assert f"MAX_QUESTION = {MAX_QUESTION_LEN};" in vm
+    assert f'maxlength="{MAX_QUESTION_LEN}"' in HTML
+    for status in get_args(Status.__value__):
+        assert f"{status}:" in vm, status
+
+
+def test_links_are_https_and_allowlisted() -> None:
+    safe = (WEB / "js" / "lib" / "safe-url.js").read_text(encoding="utf-8")
+    assert 'url.protocol !== "https:"' in safe
+    for host in ("data.go.kr", "ksponco.or.kr", "alio.go.kr"):
+        assert f'"{host}"' in safe
+    components = (WEB / "js" / "components.js").read_text(encoding="utf-8")
+    assert 'rel: "noopener noreferrer"' in components
+
+
+def test_frontend_node_tests_pass() -> None:
+    """node --test로 화면의 순수 함수(링크 검사·값 정리·서버 호출·상태)를 시험한다. node가 없으면 건너뛴다."""
+    import shutil
+    import subprocess
+
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node 없음")
+    root = Path(__file__).resolve().parents[1]
+    proc = subprocess.run([node, "--test", "web_tests/"], cwd=root, capture_output=True, text=True, timeout=120, check=False)
+    assert proc.returncode == 0, proc.stdout[-2000:] + proc.stderr[-1000:]

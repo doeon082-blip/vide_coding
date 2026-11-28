@@ -1,0 +1,50 @@
+<!doctype html>
+<!-- 채산 화면 뼈대. 인라인 스크립트·스타일이 없다(CSP가 'self'만 허용). 경로는 모두 상대 경로라 어느 주소 아래에 올려도 동작한다. -->
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="한국체육산업개발의 개방 데이터와 공개 기록을 근거로, 출처와 함께 답하는 비공식 안내 서비스">
+<title>채산 · 한체산 데이터 길라잡이 (비공식)</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/style.css">
+<script type="module" src="js/main.js"></script>
+</head>
+<body>
+<a class="skip" href="#q">질문창으로 바로 가기</a>
+<div class="wrap">
+  <header class="site-head">
+    <h1>채산 <span class="tag">비공식 서비스</span></h1>
+    <p class="lead">한국체육산업개발 공개 자료로 답하는 AI 안내예요. <strong>출처와 함께</strong> 답하고, 근거가 없으면 지어내지 않고 "모른다"고 해요.</p>
+  </header>
+
+  <main>
+    <p id="offline-banner" class="banner" hidden>서버 없이 보는 예비 화면이에요. 아래 예시 질문의 미리 계산한 답만 볼 수 있어요.</p>
+
+    <form id="ask-form" class="ask" autocomplete="off">
+      <label for="q">궁금한 것을 물어보세요</label>
+      <div class="field-row">
+        <input id="q" name="q" type="text" maxlength="200" required enterkeyhint="send" aria-describedby="q-hint"
+               placeholder="예: 올림픽공원 주차장은 몇 시에 가장 붐벼?">
+        <button id="send" type="submit" class="btn-primary">묻기</button>
+      </div>
+      <p id="q-hint" class="hint"><span id="counter">200자까지 쓸 수 있어요.</span> 이름·전화번호 같은 개인정보는 쓰지 마세요. 질문 원문은 저장하지 않아요.</p>
+    </form>
+
+    <section class="examples" aria-labelledby="ex-title">
+      <h2 id="ex-title">이런 걸 물어볼 수 있어요</h2>
+      <div id="examples" class="chip-row"></div>
+    </section>
+
+    <section id="out" class="result" aria-live="polite" aria-busy="false"></section>
+  </main>
+
+  <footer class="site-foot">
+    <p>채산은 한국체육산업개발의 공식 서비스가 아닌 <strong>비공식</strong> 안내입니다. 답은 공공데이터포털에 개방된 파일과 기관 누리집의 공개 기록(2026-11-28 기준)에서 가져오며, 자료가 오래됐을 수 있어요(답마다 자료 기간을 보여 드려요).</p>
+    <p>답은 틀릴 수 있어요. 중요한 내용은 기관에 확인하세요.</p>
+  </footer>
+</div>
+<noscript><p class="banner">이 화면은 자바스크립트가 있어야 동작해요.</p></noscript>
+</body>
+</html>

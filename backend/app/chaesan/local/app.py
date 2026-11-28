@@ -10,19 +10,18 @@
 from __future__ import annotations
 
 import asyncio
-import base64
-import hashlib
 import json
 import logging
 import os
-import re
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Final
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.responses import JSONResponse, Response
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from app.chaesan.core import guard
@@ -41,7 +40,13 @@ from app.ratelimit import RateLimitMiddleware
 
 logger = logging.getLogger(__name__)
 ASK_PATH = "/api/chaesan/ask"
-INDEX_PATH = Path(__file__).parent / "static" / "index.html"
+WEB_DIR = Path(__file__).resolve().parents[1] / "web"  # 화면 전체(HTML·CSS·JS·예시). 서비스(Cloudflare)도 같은 폴더를 올린다
+# 화면 CSP: 같은 출처의 파일만 허용한다(인라인 코드·외부 자원 없음). 통신도 같은 출처로만, 프레임에 넣을 수 없다.
+PAGE_CSP: Final = (
+    "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; "
+    "base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+)
+API_CSP: Final = "default-src 'none'"  # API 응답은 아무것도 불러올 수 없게
 ASK_LIMIT_PER_MINUTE = 10  # 질문 한 번에 LLM을 최대 3번 부르므로 축제 앱의 일반 한도보다 엄격하게
 MAX_RUNNING = 2  # 동시에 처리하는 질문 수(로컬 LLM 한 대가 감당할 수준)
 MAX_WAITING = 4  # 처리 순서를 기다리는 질문 수. 넘치면 기다리게 하지 않고 바로 503
@@ -71,22 +76,6 @@ class Gate:
             self._slots.release()
 
 
-def page_csp(html: str) -> str:
-    """화면(index.html)용 CSP. 인라인 <script>·<style>은 내용의 SHA-256 해시로만 허용한다('unsafe-inline' 없음):
-    페이지에 다른 스크립트가 끼어들면(주입) 해시가 달라 실행되지 않는다. 서버 응답과의 통신은 같은 출처로만 허용한다."""
-
-    def digest(tag: str) -> str:
-        m = re.search(rf"<{tag}>(.*?)</{tag}>", html, re.DOTALL)
-        if m is None:
-            raise ValueError(f"index.html에 <{tag}>가 없다")
-        return "'sha256-" + base64.b64encode(hashlib.sha256(m.group(1).encode("utf-8")).digest()).decode() + "'"
-
-    return (
-        f"default-src 'none'; script-src {digest('script')}; style-src {digest('style')}; connect-src 'self'; "
-        "base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
-    )
-
-
 class AskIn(BaseModel):
     question: str = Field(min_length=1, max_length=MAX_QUESTION_LEN)
 
@@ -97,6 +86,8 @@ class ChaesanRateLimit(RateLimitMiddleware):
     def _rule(self, request: Request) -> tuple[str, int, int]:
         if request.url.path == ASK_PATH:
             return "chaesan|ask", ASK_LIMIT_PER_MINUTE, 60
+        if not request.url.path.startswith("/api/"):
+            return "static", 600, 60  # 화면 파일(모듈 10여 개)을 한 번 열 때 한도에 걸리지 않게
         return "default", 60, 60
 
 
@@ -139,19 +130,13 @@ def create_app(engine: Engine | None = None, *, rate_limit: bool | None = None, 
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "no-referrer"
-        response.headers.setdefault("Content-Security-Policy", "default-src 'none'")  # 화면 경로는 자기 CSP를 먼저 넣는다
+        is_api = request.url.path.startswith("/api/")
+        response.headers["Content-Security-Policy"] = API_CSP if is_api else PAGE_CSP
         response.headers["Cache-Control"] = "no-store"
         return response
 
     app.add_middleware(ChaesanRateLimit, enabled=enabled)
     app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=["GET", "POST"], allow_headers=["content-type"])
-
-    index_html = INDEX_PATH.read_text(encoding="utf-8")  # 시작할 때 읽어, 파일이 없거나 <script>가 없으면 바로 멈춘다
-    index_headers = {"Content-Security-Policy": page_csp(index_html)}
-
-    @app.get("/", include_in_schema=False)
-    async def index() -> HTMLResponse:
-        return HTMLResponse(index_html, headers=index_headers)
 
     @app.get("/api/health")
     async def health() -> dict[str, str]:
@@ -167,6 +152,14 @@ def create_app(engine: Engine | None = None, *, rate_limit: bool | None = None, 
             raise HTTPException(status_code=503, detail=MSG_ERROR)
         return JSONResponse(json.loads(json.dumps(card.to_dict(), ensure_ascii=False, default=str)))
 
+    @app.api_route(ASK_PATH, methods=["GET", "PUT", "PATCH", "DELETE"], include_in_schema=False)
+    async def ask_wrong_method() -> Response:
+        # 화면용 정적 마운트('/')가 POST 전용 경로의 다른 방식 요청을 404로 가로채지 못하게 405를 직접 돌려준다
+        return Response(status_code=405, headers={"Allow": "POST"})
+
+    # 화면 파일은 API 경로를 모두 등록한 뒤 맨 마지막에 '/'로 붙인다(먼저 붙이면 /api/...를 가려 버린다).
+    # directory가 없으면 StaticFiles가 시작할 때 바로 오류를 낸다 → 화면 없이 조용히 뜨지 않는다.
+    app.mount("/", StaticFiles(directory=WEB_DIR, html=True), name="web")
     return app
 
 

@@ -1,0 +1,6 @@
+{
+  "name": "chaesan-web",
+  "private": true,
+  "type": "module",
+  "description": "표시용입니다. 의존성이 없고, node가 .js를 ES 모듈로 읽게 하려고(web_tests) 둡니다."
+}
