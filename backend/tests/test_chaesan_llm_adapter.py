@@ -98,6 +98,7 @@ def test_workers_request_shape_and_auth() -> None:
     assert body["model"] == WORKERS_AI_MODEL == "@cf/google/gemma-4-26b-a4b-it"
     assert body["max_tokens"] == 123 and body["temperature"] == 0.2
     assert body["response_format"] == {"type": "json_schema", "json_schema": SCHEMA}  # Workers AI 문서 형식: 스키마 자체
+    assert body["chat_template_kwargs"] == {"enable_thinking": False}  # 생각을 끄지 않으면 본문이 비어 돌아온다(실측)
     assert "reasoning_effort" not in body and "stream" not in body
     assert [m["role"] for m in body["messages"]] == ["system", "user"]
 
