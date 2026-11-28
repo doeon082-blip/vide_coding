@@ -172,6 +172,11 @@ class Engine:
             [*vocab.words, *vocab.known, *vocab.abbreviations, *(t for c in catalog.cards.values() for t in name_terms(c))]
         )
 
+    @property
+    def llm_label(self) -> str:
+        """어느 LLM으로 답했는지 구분하는 이름(사용 기록용). 어댑터가 label을 주지 않으면 'unknown'."""
+        return str(getattr(self._llm, "label", "unknown"))
+
     # ------------------------------------------------------------------ 공개 진입점
 
     async def ask(self, question: str) -> AnswerCard:
