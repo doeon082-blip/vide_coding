@@ -112,7 +112,8 @@ def test_public_allowlist_covers_exactly_what_the_page_needs() -> None:
     needed = {"index.html", "privacy.html", "favicon.svg", "css", "js", "img", "data"}
     assert needed == PUBLIC_ENTRIES
     assert needed <= top_level
-    with TestClient(create_app(None, rate_limit=False)) as c:
+    engine = Engine(db=NoDB(), llm=FakeLLM(UNKNOWN), clock=Clock(), catalog=Catalog({}, {}), vocab=Vocab({}, {}))
+    with TestClient(create_app(engine, rate_limit=False)) as c:  # 가짜 엔진: 실제 데이터 파일 없이도 돌아야 한다
         for ok in ("/", "/privacy.html", "/favicon.svg", "/css/base.css", "/js/main.js", "/img/mark.svg", "/data/examples.json"):
             assert c.get(ok).status_code == 200, ok
 
