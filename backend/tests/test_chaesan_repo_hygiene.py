@@ -78,3 +78,13 @@ def test_backend_gitignore_protects_secrets_even_from_inside_backend() -> None:
         for path in (".env", "data/chaesan.sqlite", "data/raw/files/15089962.csv"):
             checked = subprocess.run(["git", "check-ignore", "-q", path], cwd=BACKEND, check=False)
             assert checked.returncode == 0, f"backend 안에서 {path}가 무시되지 않는다"
+
+
+def test_web_examples_file_is_tracked_but_raw_data_stays_ignored() -> None:
+    """`data/` 무시 규칙이 화면의 예시 답(web/data/examples.json)까지 삼키면 저장소를 새로 받았을 때 예시가 비어 버린다.
+    (실제로 한 번 빠진 채 올라갔다.) 예시는 올리고, 원본 데이터 폴더는 계속 막는다."""
+    root = BACKEND.parent
+    example = "backend/app/chaesan/web/data/examples.json"
+    assert subprocess.run(["git", "check-ignore", "-q", example], cwd=root, check=False).returncode == 1, "예시 파일이 무시된다"
+    for path in ("backend/data/chaesan.sqlite", "backend/data/raw/files/15089962.csv", "backend/data/cards/x.json"):
+        assert subprocess.run(["git", "check-ignore", "-q", path], cwd=root, check=False).returncode == 0, path
