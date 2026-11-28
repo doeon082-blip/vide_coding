@@ -98,7 +98,7 @@ test("실패 카드: 종류별 문구, 서버 문장은 차단·혼잡·서버 �
   assert.ok(failureViewModel("offline").answer.includes("예시 질문"));
 });
 
-import { CHART_MAX_ROWS, chartOf, defaultView, followUps } from "../app/chaesan/web/js/view-model.js";
+import { CHART_MAX_ROWS, LONG_ANSWER, chartOf, defaultView, followUps, isLongAnswer } from "../app/chaesan/web/js/view-model.js";
 
 const hourly = (n) => Array.from({ length: n }, (_, i) => ({ hour: i, users: (i + 1) * 100 }));
 
@@ -160,4 +160,12 @@ test("이어서 묻기: 이미 한 질문은 빼고 다른 갈래를 먼저 고�
   assert.ok(!picked.some((p) => p.question === "h1"));
   assert.deepEqual(followUps(all, all.map((e) => e.question), null), []);
   assert.deepEqual(followUps([ex("데이터", "d1"), ex("데이터", "d2")], [], "data").map((p) => p.question), ["d1", "d2"]); // 같은 갈래뿐이면 채워 넣는다
+});
+
+test("긴 답 줄이기는 근거 표가 따로 있을 때만", () => {
+  const long = "가".repeat(LONG_ANSWER + 1);
+  assert.equal(isLongAnswer(toViewModel({ ...base, answer: long, evidence_rows: [{ a: 1 }] })), true);
+  assert.equal(isLongAnswer(toViewModel({ ...base, answer: long })), false); // 근거 표가 없으면 답이 전부이므로 줄이지 않는다
+  assert.equal(isLongAnswer(toViewModel({ ...base, answer: "짧아요", evidence_rows: [{ a: 1 }] })), false);
+  assert.equal(isLongAnswer(toViewModel({ ...base, unsupported_numbers: ["9"], evidence_rows: [{ a: 1 }] })), false); // 답을 숨긴 경우
 });
