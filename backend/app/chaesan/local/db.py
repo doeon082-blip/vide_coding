@@ -8,10 +8,14 @@ from __future__ import annotations
 
 import asyncio
 import sqlite3
+import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 from app.chaesan.core.ports import QueryResult
+
+QUERY_TIMEOUT_S: Final = 2.0  # 한 번의 SQL이 쓸 수 있는 최대 시간(질문 하나의 조회는 보통 수십 ms)
+PROGRESS_STEPS: Final = 20_000  # SQLite 가상 기계 명령 이만큼마다 시간을 확인한다
 
 
 def ro_uri(path: Path) -> str:
@@ -20,7 +24,8 @@ def ro_uri(path: Path) -> str:
 
 
 class SqliteDB:
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, *, timeout_s: float = QUERY_TIMEOUT_S) -> None:
+        self._timeout_s = timeout_s
         # check_same_thread=False: 이벤트 루프와 작업 스레드가 같은 연결을 번갈아 쓰기 때문(동시 사용은 lock으로 막는다)
         self._con = sqlite3.connect(ro_uri(path), uri=True, check_same_thread=False)
         self._con.row_factory = sqlite3.Row
@@ -32,7 +37,15 @@ class SqliteDB:
         return QueryResult(rows=rows, rows_read=len(rows))
 
     def _run(self, sql: str, params: tuple[Any, ...]) -> list[dict[str, Any]]:
-        return [dict(r) for r in self._con.execute(sql, params).fetchall()]
+        # 시간 제한: AI가 만든 SQL이 같은 큰 표(21만 행)끼리 조인하는 식으로 무거워지면
+        # 한 요청이 DB와 동시 처리 자리를 오래 붙잡아 다른 사용자가 모두 막힌다.
+        # 시간이 지나면 SQLite가 조회를 중단하고(OperationalError: interrupted) 엔진은 이를 '조회 실패'로 처리한다.
+        deadline = time.monotonic() + self._timeout_s
+        self._con.set_progress_handler(lambda: 1 if time.monotonic() > deadline else 0, PROGRESS_STEPS)
+        try:
+            return [dict(r) for r in self._con.execute(sql, params).fetchall()]
+        finally:
+            self._con.set_progress_handler(None, 0)
 
     def close(self) -> None:
         self._con.close()
