@@ -142,13 +142,14 @@ def test_body_size_and_bad_content_length() -> None:
         assert odd.status_code == 400
 
 
-def test_cors_only_for_allowed_origin() -> None:
+def test_no_cross_origin_access_is_granted() -> None:
+    """화면과 API가 같은 주소라 CORS가 필요 없다: 다른 출처에는 어떤 허용 헤더도 주지 않는다(옛 5173 개발 서버 설정은 삭제)."""
     c, _ = client()
     with c:
-        ok = c.options(ASK_PATH, headers={"origin": "http://localhost:5173", "access-control-request-method": "POST"})
-        evil = c.options(ASK_PATH, headers={"origin": "http://evil.example", "access-control-request-method": "POST"})
-    assert ok.headers.get("access-control-allow-origin") == "http://localhost:5173"
-    assert "access-control-allow-origin" not in evil.headers
+        for origin in ("http://localhost:5173", "http://evil.example"):
+            r = c.options(ASK_PATH, headers={"origin": origin, "access-control-request-method": "POST"})
+            assert "access-control-allow-origin" not in r.headers
+            assert "access-control-allow-origin" not in post(c, "안녕").headers
 
 
 def test_get_is_not_allowed_on_ask() -> None:
