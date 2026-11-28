@@ -13,20 +13,21 @@ import asyncio
 import json
 import logging
 import os
+import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
+from datetime import datetime
 from pathlib import Path
 from typing import Final
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from app.chaesan.core import guard
 from app.chaesan.core.catalog import load_catalog
-from app.chaesan.core.config import MAX_QUESTION_LEN
+from app.chaesan.core.config import KST, MAX_QUESTION_LEN
 from app.chaesan.core.correct import load_vocab
 from app.chaesan.core.engine import MSG_ERROR, Engine
 from app.chaesan.ingest.aliases import ALIASES_PATH
@@ -36,7 +37,8 @@ from app.chaesan.local.clock import SystemClock
 from app.chaesan.local.db import SqliteDB
 from app.chaesan.local.demand import JsonlDemandSink
 from app.chaesan.local.llm import make_llm
-from app.chaesan.local.ratelimit import RateLimitMiddleware
+from app.chaesan.local.ratelimit import RateLimitMiddleware, client_ip
+from app.chaesan.local.usage_log import FileUsageLog, Pseudonymizer, UsageSink, build_event
 
 logger = logging.getLogger(__name__)
 ASK_PATH = "/api/chaesan/ask"
@@ -107,7 +109,10 @@ def build_engine(
     )
 
 
-def create_app(engine: Engine | None = None, *, rate_limit: bool | None = None, gate: Gate | None = None) -> FastAPI:
+def create_app(
+    engine: Engine | None = None, *, rate_limit: bool | None = None, gate: Gate | None = None, usage: UsageSink | None = None
+) -> FastAPI:
+    """usage: 사용 기록을 받는 곳(None이면 기록하지 않는다. 시험이 파일을 만들지 않게 기본값은 없음)."""
     limiter = gate or Gate()
     docs_on = os.getenv("ENABLE_DOCS", "off").lower() == "on"
 
@@ -124,7 +129,7 @@ def create_app(engine: Engine | None = None, *, rate_limit: bool | None = None, 
         openapi_url="/openapi.json" if docs_on else None,
     )
     enabled = rate_limit if rate_limit is not None else os.getenv("RATE_LIMIT", "on").lower() != "off"
-    origins = [o.strip() for o in os.getenv("CHAESAN_CORS_ORIGINS", "http://localhost:5173").split(",") if o.strip()]
+    pseudonym = Pseudonymizer()
 
     @app.middleware("http")
     async def security_headers(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
@@ -138,7 +143,34 @@ def create_app(engine: Engine | None = None, *, rate_limit: bool | None = None, 
         return response
 
     app.add_middleware(ChaesanRateLimit, enabled=enabled)
-    app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=["GET", "POST"], allow_headers=["content-type"])
+
+    if usage is not None:
+        sink = usage
+
+        # 가장 바깥에 붙인다(요청 제한이 막은 429도 기록하려고). 경로가 /api/인 요청만, 건강 확인(/api/health)은 소음이라 뺀다.
+        @app.middleware("http")
+        async def usage_logging(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+            started = time.perf_counter()
+            status_code = 500  # 처리 중 예외가 나면 기록은 500으로 남긴다
+            try:
+                response = await call_next(request)
+                status_code = response.status_code
+                return response
+            finally:
+                path = request.url.path
+                if path.startswith("/api/") and path != "/api/health":
+                    now = datetime.now(KST)
+                    sink.record(
+                        build_event(
+                            now=now,
+                            method=request.method,
+                            path=path,
+                            status_code=status_code,
+                            elapsed_ms=round((time.perf_counter() - started) * 1000),
+                            ip_pseudonym=pseudonym(client_ip(request), now),
+                            extra=getattr(request.state, "usage", None),
+                        )
+                    )
 
     @app.get("/api/health")
     async def health() -> dict[str, str]:
@@ -148,6 +180,24 @@ def create_app(engine: Engine | None = None, *, rate_limit: bool | None = None, 
     async def ask(body: AskIn, request: Request) -> JSONResponse:
         async with limiter.enter():
             card = await request.app.state.engine.ask(body.question)
+        # 처리 결과 요약만 남긴다(질문·답변 글자는 싣지 않는다). 사용 기록 미들웨어가 요청 기록에 합쳐 쓴다.
+        now = datetime.now(KST)
+        request.state.usage = {
+            "q_len": len(body.question),
+            "q_hash": pseudonym(body.question, now),
+            "result": card.status,
+            "intent": card.meta.get("intent"),
+            "llm_calls": card.meta.get("llm_calls"),
+            "input_tokens": card.meta.get("input_tokens"),
+            "output_tokens": card.meta.get("output_tokens"),
+            "rows_read": card.meta.get("rows_read"),
+            "engine_ms": card.meta.get("elapsed_ms"),
+            "sources": [str(src.get("id")) for src in card.sources],
+            "corrections": len(card.corrections),
+            "unsupported_numbers": len(card.unsupported_numbers),
+            "documents": len(card.documents),
+            "evidence_rows": len(card.evidence_rows),
+        }
         if card.status == "blocked":
             raise HTTPException(status_code=400, detail=guard.BLOCK_MESSAGE)
         if card.status == "error":
@@ -165,4 +215,4 @@ def create_app(engine: Engine | None = None, *, rate_limit: bool | None = None, 
     return app
 
 
-app = create_app()
+app = create_app(usage=FileUsageLog())
