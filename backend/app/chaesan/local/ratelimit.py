@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ipaddress
 import time
 from collections import defaultdict, deque
 
@@ -26,13 +27,32 @@ _LOOPBACK = {"127.0.0.1", "::1", "localhost"}
 MAX_BODY_BYTES = 8 * 1024
 
 
+def _bucket_ip(text: str) -> str | None:
+    """요청 제한의 '사용자 구분 값'으로 쓸 IP. 형식이 올바른 IP만 인정하고, IPv6는 /64 묶음 하나로 본다.
+
+    왜: ① 형식 검증 없이 헤더 글자를 키로 쓰면 요청마다 다른 값을 보내 제한을 피하고 메모리를 키울 수 있다.
+    ② IPv6 사용자는 보통 /64 전체(2^64개)를 받아서, 주소 하나씩 세면 같은 사람이 주소를 바꿔 가며 제한을 피한다.
+    """
+    try:
+        addr = ipaddress.ip_address(text.strip())
+    except ValueError:
+        return None
+    if isinstance(addr, ipaddress.IPv6Address):
+        if addr.ipv4_mapped is not None:
+            return str(addr.ipv4_mapped)
+        return str(ipaddress.ip_network((addr, 64), strict=False))
+    return str(addr)
+
+
 def client_ip(request: Request) -> str:
-    """실제 연결 상대의 IP. 상대가 같은 PC의 터널(cloudflared)일 때만 Cloudflare가 넣어 주는
-    CF-Connecting-IP를 신뢰한다. 외부에서 직접 붙은 요청의 헤더(X-Forwarded-For 등)는 위조될 수 있어 무시한다."""
+    """실제 연결 상대의 IP(사용자 구분 값). 상대가 같은 PC의 터널·프록시일 때만 Cloudflare가 넣어 주는
+    CF-Connecting-IP를 신뢰한다. 외부에서 직접 붙은 요청의 헤더(X-Forwarded-For 등)는 위조될 수 있어 무시한다.
+    값이 IP 모양이 아니면 헤더를 버리고 연결 상대를 쓴다(프록시를 쓸 때는 프록시가 이 헤더를 직접 덮어써야 한다)."""
     peer = request.client.host if request.client else "unknown"
     if peer in _LOOPBACK:
-        return request.headers.get("cf-connecting-ip") or peer
-    return peer
+        forwarded = request.headers.get("cf-connecting-ip")
+        return (_bucket_ip(forwarded) if forwarded else None) or peer
+    return _bucket_ip(peer) or peer
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
