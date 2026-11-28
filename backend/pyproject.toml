@@ -3,7 +3,7 @@ name = "festival-backend"
 version = "0.1.0"
 description = "Festival info + local AI curation backend"
 authors = [
-    { name = "귀염뽀작도언이", email = "doeon082@gmail.com" }
+    { name = "귀염뽀작도언이" }
 ]
 requires-python = ">=3.12"
 dependencies = [
