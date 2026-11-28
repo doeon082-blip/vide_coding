@@ -230,6 +230,29 @@ def test_page_is_served_with_self_only_csp() -> None:
     assert r.headers["cache-control"] == "no-store"
 
 
+def test_every_js_import_resolves_to_a_real_file() -> None:
+    """import 경로 오타는 브라우저에서야 드러난다. 모든 상대 import가 실제 파일을 가리키는지 정적으로 확인한다."""
+    pattern = re.compile(r"""(?:import|export)\s[^;]*?from\s+["'](\.{1,2}/[^"']+)["']""")
+    checked = 0
+    for path in JS_FILES:
+        for spec in pattern.findall(path.read_text(encoding="utf-8")):
+            assert (path.parent / spec).resolve().is_file(), f"{path.name}: {spec}"
+            checked += 1
+    assert checked > 40
+    # 모든 js 파일이 어딘가에서 쓰인다(죽은 파일 없음): main.js에서 import로 닿을 수 있어야 한다
+    seen: set[Path] = set()
+    todo = [WEB / "js" / "main.js"]
+    while todo:
+        current = todo.pop()
+        if current in seen:
+            continue
+        seen.add(current)
+        todo += [(current.parent / s).resolve() for s in pattern.findall(current.read_text(encoding="utf-8"))]
+    assert {p.resolve() for p in JS_FILES} <= {p.resolve() for p in seen}, sorted(
+        p.name for p in JS_FILES if p.resolve() not in seen
+    )
+
+
 def test_meta_csp_matches_the_server_header() -> None:
     """정적 호스팅용 meta CSP가 서버 헤더와 같은 제한이다(frame-ancestors는 meta로 쓸 수 없어 뺀다)."""
     from app.chaesan.local.app import PAGE_CSP
@@ -245,7 +268,7 @@ def test_every_page_asset_is_served_with_a_usable_type() -> None:
     c, _ = client()
     with c:
         assert c.get("/js/main.js").headers["content-type"].split(";")[0] in ("text/javascript", "application/javascript")
-        for sheet in ("base", "layout", "card"):
+        for sheet in ("base", "layout", "card", "evidence", "chat"):
             assert c.get(f"/css/{sheet}.css").headers["content-type"].startswith("text/css")
         assert c.get("/img/hero-light.svg").headers["content-type"].startswith("image/svg+xml")
         assert c.get("/data/examples.json").json()["examples"]
@@ -382,7 +405,7 @@ def test_frontend_and_backend_agree_on_limits_and_statuses() -> None:
     from app.chaesan.core.config import MAX_QUESTION_LEN
     from app.chaesan.core.engine import Status
 
-    vm = (WEB / "js" / "view-model.js").read_text(encoding="utf-8")
+    vm = (WEB / "js" / "view-model" / "constants.js").read_text(encoding="utf-8")
     assert f"MAX_QUESTION = {MAX_QUESTION_LEN};" in vm
     assert f'maxlength="{MAX_QUESTION_LEN}"' in HTML
     for status in get_args(Status.__value__):
@@ -394,7 +417,7 @@ def test_links_are_https_and_allowlisted() -> None:
     assert 'url.protocol !== "https:"' in safe
     for host in ("data.go.kr", "ksponco.or.kr", "alio.go.kr"):
         assert f'"{host}"' in safe
-    components = (WEB / "js" / "components.js").read_text(encoding="utf-8")
+    components = (WEB / "js" / "components" / "link.js").read_text(encoding="utf-8")
     assert 'rel: "noopener noreferrer"' in components
 
 
