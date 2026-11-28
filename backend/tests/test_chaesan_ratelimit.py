@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.ratelimit import RateLimitMiddleware
+from app.chaesan.local.ratelimit import RateLimitMiddleware
 
 app = FastAPI()
 app.add_middleware(RateLimitMiddleware)

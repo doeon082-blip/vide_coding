@@ -9,6 +9,7 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import Response
+from starlette.types import ASGIApp
 
 # (경로 접두사, 메서드) -> (허용 횟수, 윈도우 초). 위에서부터 먼저 일치하는 규칙 적용.
 RULES: list[tuple[str, str | None, int, int]] = [
@@ -35,7 +36,7 @@ def client_ip(request: Request) -> str:
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app, enabled: bool = True) -> None:  # noqa: ANN001
+    def __init__(self, app: ASGIApp, enabled: bool = True) -> None:
         super().__init__(app)
         self.enabled = enabled
         self.hits: dict[tuple[str, str], deque[float]] = defaultdict(deque)

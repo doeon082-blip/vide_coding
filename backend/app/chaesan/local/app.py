@@ -36,7 +36,7 @@ from app.chaesan.local.clock import SystemClock
 from app.chaesan.local.db import SqliteDB
 from app.chaesan.local.demand import JsonlDemandSink
 from app.chaesan.local.llm import OllamaLLM
-from app.ratelimit import RateLimitMiddleware
+from app.chaesan.local.ratelimit import RateLimitMiddleware
 
 logger = logging.getLogger(__name__)
 ASK_PATH = "/api/chaesan/ask"
