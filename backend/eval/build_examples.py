@@ -1,4 +1,4 @@
-"""화면의 예시 답을 만든다(H4): 예시 질문을 실제 엔진에 돌려 응답을 그대로 `web/data/examples.json`에 저장한다.
+"""화면의 예시 답을 만든다(H4): 예시 질문을 실제 엔진에 돌려 응답을 그대로 `frontend/data/examples.json`에 저장한다.
 
 실행: `uv run python -m eval.build_examples [--refresh]` (backend/ 에서, Ollama 필요). 저장된 답이 있으면 새 질문만 만든다.
 원칙
@@ -24,7 +24,7 @@ from app.chaesan.ingest.load import BACKEND_DIR
 from app.chaesan.local.app import build_engine
 
 QUESTIONS = BACKEND_DIR / "eval" / "example_questions.json"
-OUT = BACKEND_DIR / "app" / "chaesan" / "web" / "data" / "examples.json"
+OUT = BACKEND_DIR.parent / "frontend" / "data" / "examples.json"
 
 
 def usable(card: dict[str, Any], expect: str = "answered") -> str | None:
@@ -84,7 +84,7 @@ def main() -> None:
     kept, skipped = asyncio.run(build(build_engine(record_demand=False), questions, saved))
     stamp = datetime.now(KST).isoformat(timespec="seconds")
     OUT.write_text(json.dumps({"generated_at": stamp, "examples": kept}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print(f"저장 {len(kept)}개 → {Path(OUT).relative_to(BACKEND_DIR)} ({stamp})")
+    print(f"저장 {len(kept)}개 → {Path(OUT).relative_to(BACKEND_DIR.parent)} ({stamp})")
     for line in skipped:
         print("빠짐:", line)
 

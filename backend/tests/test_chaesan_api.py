@@ -204,9 +204,9 @@ def test_build_engine_can_turn_demand_recording_off(tmp_path: Any) -> None:
     assert build_engine()._sink is not None
 
 
-# --------------------------------------------------------------------------- 화면(web/ 폴더, GET /)
+# --------------------------------------------------------------------------- 화면(frontend/ 폴더, GET /)
 
-WEB = Path(__file__).resolve().parents[1] / "app" / "chaesan" / "web"
+WEB = Path(__file__).resolve().parents[2] / "frontend"  # 저장소 루트의 frontend/
 HTML = (WEB / "index.html").read_text(encoding="utf-8")
 JS_FILES = sorted((WEB / "js").rglob("*.js"))
 
@@ -228,6 +228,16 @@ def test_page_is_served_with_self_only_csp() -> None:
     assert "http" not in csp  # 외부 주소를 허용하지 않는다
     assert r.headers["x-content-type-options"] == "nosniff"
     assert r.headers["cache-control"] == "no-store"
+
+
+def test_meta_csp_matches_the_server_header() -> None:
+    """정적 호스팅용 meta CSP가 서버 헤더와 같은 제한이다(frame-ancestors는 meta로 쓸 수 없어 뺀다)."""
+    from app.chaesan.local.app import PAGE_CSP
+
+    meta = re.search(r'http-equiv="Content-Security-Policy" content="([^"]+)"', HTML)
+    assert meta is not None
+    as_set = lambda text: {d.strip() for d in text.split(";") if d.strip()}  # noqa: E731
+    assert as_set(meta.group(1)) == as_set(PAGE_CSP) - {"frame-ancestors 'none'"}
 
 
 def test_every_page_asset_is_served_with_a_usable_type() -> None:
@@ -396,6 +406,5 @@ def test_frontend_node_tests_pass() -> None:
     node = shutil.which("node")
     if node is None:
         pytest.skip("node 없음")
-    root = Path(__file__).resolve().parents[1]
-    proc = subprocess.run([node, "--test", "web_tests/"], cwd=root, capture_output=True, text=True, timeout=120, check=False)
+    proc = subprocess.run([node, "--test", "tests/"], cwd=WEB, capture_output=True, text=True, timeout=120, check=False)
     assert proc.returncode == 0, proc.stdout[-2000:] + proc.stderr[-1000:]

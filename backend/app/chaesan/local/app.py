@@ -31,7 +31,7 @@ from app.chaesan.core.correct import load_vocab
 from app.chaesan.core.engine import MSG_ERROR, Engine
 from app.chaesan.ingest.aliases import ALIASES_PATH
 from app.chaesan.ingest.cards import CARDS_DIR
-from app.chaesan.ingest.load import DB_PATH
+from app.chaesan.ingest.load import BACKEND_DIR, DB_PATH
 from app.chaesan.local.clock import SystemClock
 from app.chaesan.local.db import SqliteDB
 from app.chaesan.local.demand import JsonlDemandSink
@@ -40,7 +40,9 @@ from app.ratelimit import RateLimitMiddleware
 
 logger = logging.getLogger(__name__)
 ASK_PATH = "/api/chaesan/ask"
-WEB_DIR = Path(__file__).resolve().parents[1] / "web"  # 화면 전체(HTML·CSS·JS·예시). 서비스(Cloudflare)도 같은 폴더를 올린다
+WEB_DIR = (
+    BACKEND_DIR.parent / "frontend"
+)  # 화면 전체(HTML·CSS·JS·예시)는 저장소 루트의 frontend/. 서비스(Cloudflare)도 같은 폴더를 올린다
 # 화면 CSP: 같은 출처의 파일만 허용한다(인라인 코드·외부 자원 없음). 통신도 같은 출처로만, 프레임에 넣을 수 없다.
 PAGE_CSP: Final = (
     "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; "

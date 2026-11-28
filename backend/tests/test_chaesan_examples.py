@@ -1,4 +1,4 @@
-"""화면 예시 답(web/data/examples.json) 검사: 구조·개인정보·링크 도메인, 개발용 질문과의 겹침, 그리고 숫자를 DB로 다시 확인한다.
+"""화면 예시 답(frontend/data/examples.json) 검사: 구조·개인정보·링크 도메인, 개발용 질문과의 겹침, 숫자의 DB 재확인.
 
 예시 답은 엔진이 낸 응답을 그대로 저장한 것이라(손으로 쓰지 않음), 데이터가 바뀌어 틀린 답이 남지 않도록 DB로 다시 맞춰 본다.
 이 파일은 시험용 60문항(test_questions.jsonl)을 열지 않는다(규칙 11).
@@ -17,7 +17,7 @@ import pytest
 from app.chaesan.core.answer import find_unsupported_numbers
 from app.chaesan.ingest.load import BACKEND_DIR, DB_PATH
 
-EXAMPLES = BACKEND_DIR / "app" / "chaesan" / "web" / "data" / "examples.json"
+EXAMPLES = BACKEND_DIR.parent / "frontend" / "data" / "examples.json"
 QUESTIONS = BACKEND_DIR / "eval" / "example_questions.json"
 DEV = BACKEND_DIR / "eval" / "dev_questions.jsonl"
 ALLOWED_HOSTS = ("data.go.kr", "ksponco.or.kr", "alio.go.kr")  # 화면 js/lib/safe-url.js의 허용 목록과 같아야 한다

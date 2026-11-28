@@ -39,11 +39,16 @@ def test_env_example_lists_every_setting_the_code_reads() -> None:
     assert not missing, f"예시에 없는 설정: {sorted(missing)}"
 
 
-def test_frontend_env_has_only_public_names() -> None:
-    """VITE_ 변수는 빌드 결과(브라우저)에 그대로 들어간다. 비밀로 보이는 이름은 금지."""
-    names = _env_names(REPO / "frontend" / ".env.example")
-    assert names and all(n.startswith("VITE_") for n in names)
-    assert not [n for n in names if re.search(r"KEY|SECRET|TOKEN|PASSWORD", n)]
+def test_frontend_has_no_env_files_and_no_build_time_settings() -> None:
+    """채산 화면은 빌드·환경변수가 없는 정적 파일이다(브라우저로 나가는 파일에 비밀이 들어갈 길이 없다).
+    예전 축제 앱의 VITE_ 환경변수·.env 예시는 앱과 함께 지웠고, 다시 생기지 않게 한다."""
+    front = REPO / "frontend"
+    assert not list(front.rglob(".env*")), "frontend에 .env 계열 파일이 있다"
+    for path in front.rglob("*"):
+        if path.is_file() and path.suffix in {".js", ".mjs", ".html", ".css", ".json", ".md"}:
+            text = path.read_text(encoding="utf-8")
+            assert "VITE_" not in text and "import.meta.env" not in text, path.name
+            assert not re.search(r"(API_KEY|SECRET|TOKEN|PASSWORD)\s*[:=]", text), path.name
 
 
 def _git(*args: str) -> str:
@@ -81,10 +86,10 @@ def test_backend_gitignore_protects_secrets_even_from_inside_backend() -> None:
 
 
 def test_web_examples_file_is_tracked_but_raw_data_stays_ignored() -> None:
-    """`data/` 무시 규칙이 화면의 예시 답(web/data/examples.json)까지 삼키면 저장소를 새로 받았을 때 예시가 비어 버린다.
+    """`data/` 무시 규칙이 화면의 예시 답(frontend/data/examples.json)까지 삼키면 저장소를 새로 받았을 때 예시가 비어 버린다.
     (실제로 한 번 빠진 채 올라갔다.) 예시는 올리고, 원본 데이터 폴더는 계속 막는다."""
     root = BACKEND.parent
-    example = "backend/app/chaesan/web/data/examples.json"
+    example = "frontend/data/examples.json"
     assert subprocess.run(["git", "check-ignore", "-q", example], cwd=root, check=False).returncode == 1, "예시 파일이 무시된다"
     for path in ("backend/data/chaesan.sqlite", "backend/data/raw/files/15089962.csv", "backend/data/cards/x.json"):
         assert subprocess.run(["git", "check-ignore", "-q", path], cwd=root, check=False).returncode == 0, path
