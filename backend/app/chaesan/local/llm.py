@@ -28,6 +28,8 @@ PUBLIC_ERROR: Final = "AI 서비스를 일시적으로 사용할 수 없습니�
 # 같은 질문의 결과가 실행마다 달라지는 것은 프롬프트에 매번 새로 넣는 1회용 난수(데이터 구분자 nonce, 유출 감지 canary) 때문이다.
 # 보안 장치라 없애지 않으므로 정확도는 3회 반복의 범위로 잰다.
 
+OLLAMA_TIMEOUT_S: Final = 180.0  # 내 컴퓨터는 모델 첫 로딩이 느릴 수 있다
+WORKERS_AI_TIMEOUT_S: Final = 60.0
 # Cloudflare Workers AI: 로컬에서 튜닝한 gemma4 26B와 같은 계열의 모델(Neurons 소모는 대시보드에서 확인).
 WORKERS_AI_MODEL: Final = "@cf/google/gemma-4-26b-a4b-it"
 _ACCOUNT_ID = re.compile(
@@ -70,7 +72,7 @@ class OllamaLLM:
     ) -> None:
         self._base = (base_url or os.getenv("OLLAMA_BASE_URL") or "http://localhost:11434").rstrip("/")
         self._model = model
-        self._timeout = timeout or float(os.getenv("OLLAMA_TIMEOUT") or 180)
+        self._timeout = timeout or OLLAMA_TIMEOUT_S
         self._transport = transport  # 테스트에서 가짜 서버를 끼우는 자리
 
     async def chat_json(
@@ -119,7 +121,7 @@ class WorkersAILLM:
         self._url = f"https://api.cloudflare.com/client/v4/accounts/{account}/ai/v1/chat/completions"
         self._headers = {"Authorization": f"Bearer {token}"}
         self._model = name
-        self._timeout = timeout or float(os.getenv("CLOUDFLARE_AI_TIMEOUT") or 60)
+        self._timeout = timeout or WORKERS_AI_TIMEOUT_S
         self._transport = transport
 
     def __repr__(self) -> str:  # 로그·오류 출력에 토큰이 딸려 나오지 않게
