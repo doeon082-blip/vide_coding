@@ -39,11 +39,13 @@
 | F | 개발용 질문 20개로 검사 | 측정 완료(자료 선택 95%, 3회) |
 | G | 화면과 배포(Cloudflare Workers/D1) | 화면 재구성 완료(H1~H2), 예시 답·배포 대기 |
 
-**아직 되지 않는 것(숨기지 않습니다):** 서비스 배포(Cloudflare)는 아직 없고(로컬 서버 `http://localhost:8100/`에서 화면이 열립니다), 개발용 질문 20개로 정확도를 재는 검사(F단계)를 하지 않았습니다. `POST /api/chaesan/ask`는 로컬에서만 동작합니다. 오픈API 28종은 연결 전이고, 기상청·서울 도시데이터·특일 정보도 2단계 계획입니다. 한글로 쓴 수("삼십 명")는 숫자 대조가 읽지 못해, 프롬프트로 아라비아 숫자만 쓰게 하고 답변 단계에서 따로 거릅니다.
+**아직 되지 않는 것(숨기지 않습니다):** 서비스 배포(Cloudflare)는 아직 없고(로컬 서버 `http://localhost:8100/`에서 화면이 열립니다), 개발용 질문 20개 검사(F단계) 결과는 자체 제작 문항이라 시험용 60문항보다 쉬울 수 있습니다. `POST /api/chaesan/ask`는 로컬에서만 동작합니다. 오픈API 28종은 연결 전이고, 기상청·서울 도시데이터·특일 정보도 2단계 계획입니다. 한글로 쓴 수("삼십 명")는 숫자 대조가 읽지 못해, 프롬프트로 아라비아 숫자만 쓰게 하고 답변 단계에서 따로 거릅니다.
 
 ## 구조
 
 ```
+frontend/               # 화면: 빌드 없는 HTML·CSS·JS 모듈(로컬·서비스 공통). 설명은 frontend/README.md
+├── index.html  css/  js/  img/  data/examples.json  tests/   # tests는 npm test(node --test)
 backend/app/chaesan/
 ├── core/        # 로컬·서비스 공통. 표준 라이브러리만 사용(Cloudflare Python Workers에서 그대로 돌아야 함)
 │   ├── config.py   ports.py     # 설정값, db·llm·clock 어댑터 인터페이스
@@ -56,7 +58,6 @@ backend/app/chaesan/
 │   ├── when.py                  # "지난달·7월·주말" 같은 기간 해석(과거 기준)
 │   └── sql_guard.py  answer.py  typo.py   # SQL 검사, 답 속 숫자 대조·배지, 자모 풀기·편집 거리
 ├── local/       # 로컬 전용: sqlite 어댑터, Ollama, 시계, 수요 기록 파일, FastAPI(app.py)
-├── web/         # 화면: 빌드 없는 HTML·CSS·JS 모듈(로컬·서비스 공통). 순수 함수 시험은 ../../web_tests/ (node --test)
 └── ingest/      # 로컬 전용: 원본 CSV → SQLite
     ├── specs.py convert.py load.py aggregate.py   # 적재
     ├── card_meta.py cards.py                      # 데이터 카드(58개: 적재 31 + 미연결 API 27)
