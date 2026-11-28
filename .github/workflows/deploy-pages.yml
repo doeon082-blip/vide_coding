@@ -28,7 +28,7 @@ jobs:
       - name: 올릴 파일만 모으기(시험·설정 파일 제외)
         run: |
           mkdir _site
-          cp -r frontend/index.html frontend/favicon.svg frontend/css frontend/js frontend/img frontend/data _site/
+          cp -r frontend/index.html frontend/privacy.html frontend/favicon.svg frontend/css frontend/js frontend/img frontend/data _site/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
