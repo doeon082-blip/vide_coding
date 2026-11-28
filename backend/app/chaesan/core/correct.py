@@ -37,6 +37,35 @@ _JOSA_TEXT: Final = (
     "은 는 이 가 을 를 의 에 도 만 로 와 과 나 랑 요 인 이다"
 )
 _JOSA: Final = tuple(sorted(_JOSA_TEXT.split(), key=len, reverse=True))
+# '주차 + 한', '수영 + 했어'처럼 사전 낱말에 하다 동사 어미가 붙은 꼴은 오타가 아니다(자모 거리가 가까워도 고치거나 되묻지 않는다)
+_HADA: Final = tuple(
+    sorted(
+        {
+            "합니다",
+            "했는데",
+            "하려고",
+            "했던",
+            "했다",
+            "했어",
+            "했어요",
+            "하는",
+            "하고",
+            "하면",
+            "한다",
+            "해서",
+            "하려",
+            "하기",
+            "하나",
+            "한",
+            "했",
+            "할",
+            "해",
+            "하",
+        },
+        key=len,
+        reverse=True,
+    )
+)
 _HANGUL_RUN: Final = re.compile(r"[가-힣]+")
 
 
@@ -108,6 +137,10 @@ class Corrector:
     def _decide(self, token: str) -> tuple[str, Correction | Suggestion | None]:
         """낱말 하나의 판단. 반환: (바꿀 낱말, 보정 기록 또는 되묻기 또는 None)."""
         splits = self._splits(token)
+        for suffix in _HADA:
+            base = token[: -len(suffix)]
+            if token.endswith(suffix) and len(base) >= 2 and (base in self._vocab.words or base in self._vocab.known):
+                return token, None
         for stem, josa in splits:  # ① 사전에 이미 있는 말이거나 약칭이면 오타 계산을 하지 않는다
             if stem in self._vocab.abbreviations:
                 full = self._vocab.abbreviations[stem]

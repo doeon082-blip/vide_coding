@@ -212,3 +212,52 @@ async def search_docs(
         scored.sort(key=lambda h: (-h.score, -(len(h.matched_terms)), h.doc_id))
     result.hits = scored[:limit]
     return result
+
+
+def _hit(row: Mapping[str, Any], score: float, matched: tuple[str, ...]) -> Hit:
+    return Hit(
+        doc_id=row["doc_id"], source_id=row["source_id"], source_row=row["source_row"], title=row["title"], body=row["body"],
+        doc_date=row["doc_date"], url=row["url"], body_available=bool(row["body_available"]),
+        suspicious=bool(row["suspicious"]), score=score, matched_terms=matched,
+    )  # fmt: skip
+
+
+async def list_docs_in_period(
+    db: DB,
+    *,
+    weights: Mapping[str, float],
+    source_ids: Collection[str],
+    start: date | None,
+    end: date | None,
+    order: Order = "date_desc",
+    limit: int = 10,
+) -> SearchResult:
+    """검색어 없이 기간(코드가 해석한 값)만으로 문서를 나열한다. '○년 ○월에 무슨 일이 있었어?'처럼 기간이 질문의 전부일 때 쓴다.
+    날짜 칸이 없는 문서는 제외한다(날짜를 지어내지 않는다). 요약(total·first·last)은 일치한 전체 기준이다."""
+    result = SearchResult()
+    if limit <= 0 or not source_ids or (start is None and end is None):
+        return result
+    src_sql, src_params = _in_clause(source_ids)
+    lo = start.strftime("%Y-%m") if start else "0000-00"
+    hi = end.strftime("%Y-%m") if end else "9999-99"
+    sql = (
+        f"SELECT {_COLUMNS}, 0.0 AS rank FROM docs d "  # noqa: S608
+        f"WHERE d.doc_date IS NOT NULL AND substr(d.doc_date, 1, 7) >= ? AND substr(d.doc_date, 1, 7) <= ?{src_sql} "
+        f"ORDER BY d.doc_date LIMIT {CANDIDATES_PER_TERM}"
+    )
+    res = await db.query(sql, (lo, hi, *src_params))
+    result.rows_read += res.rows_read
+    result.capped = len(res.rows) >= CANDIDATES_PER_TERM
+    hits = [_hit(r, weights.get(r["source_id"], 0.5), ()) for r in res.rows if _in_period(r["doc_date"], start, end)]
+    dates = [h.doc_date for h in hits if h.doc_date]
+    result.total = len(hits)
+    result.first_date = min(dates) if dates else None
+    result.last_date = max(dates) if dates else None
+    if order == "date_desc":
+        hits.sort(key=lambda h: (h.doc_date or "", h.doc_id), reverse=True)
+    elif order == "date_asc":
+        hits.sort(key=lambda h: (h.doc_date or "", h.doc_id))
+    else:
+        hits.sort(key=lambda h: (-h.score, h.doc_date or "", h.doc_id))
+    result.hits = hits[:limit]
+    return result

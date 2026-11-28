@@ -607,3 +607,75 @@ def test_sibling_cards_join_candidates_for_small_groups(env: SimpleNamespace) ->
     llm = ScriptedLLM(plan(intent="unknown", answerable=False))
     run(make(env, llm).ask("올림픽공원 주차장은 몇 시에 가장 붐벼?"))
     assert "id=15138735" in llm.calls[0][1]  # '주차장'이 직접 가리키지 않은 입출차 카드가 같은 묶음이라 후보에 있다
+
+
+# --------------------------------------------------------------------------- 1차 측정(F단계)에서 찾은 결함의 회귀 테스트
+
+
+def test_explanation_prompt_shows_the_executed_sql_and_narrow_refusal_rule(env: SimpleNamespace) -> None:
+    """측정에서 찾은 문제: 결과 열이 SUM(users)처럼 모호한데 SQL을 안 보여 줘서, 맞는 값을 설명 LLM이 '모른다'로 바꿨다."""
+    llm = ScriptedLLM(plan(card_ids=["15133891"], sql=TENNIS_SQL), {"answer": "표를 보세요", "answers_question": True})
+    run(make(env, llm).ask(TENNIS_Q))
+    prompt = llm.calls[1][1]
+    assert "[조회한 SQL" in prompt
+    assert "SUM(users) AS users" in prompt
+    assert "그 때문에 answers_question을 false로 하지 않는다" in prompt  # 주의점은 단서로 덧붙이고 거절 사유가 아니다
+
+
+def test_plan_prompt_asks_for_column_aliases_and_period_only_documents(env: SimpleNamespace) -> None:
+    llm = ScriptedLLM(plan(intent="unknown", answerable=False))
+    run(make(env, llm).ask(TENNIS_Q))
+    prompt = llm.calls[0][1]
+    assert "AS 별칭" in prompt
+    assert "search_terms를 비워도 된다" in prompt
+
+
+def test_superlative_recent_adds_no_date_filter(env: SimpleNamespace) -> None:
+    """측정에서 찾은 문제: '가장 최근 보도자료'가 '최근 30일' 날짜 조건이 되어 빈 결과가 됐다."""
+    llm = ScriptedLLM(plan(intent="news", answerable=False))
+    run(make(env, llm).ask("가장 최근 보도자료는 언제 배포했어?"))
+    assert "[코드가 해석한 기간] 없음" in llm.calls[0][1]
+
+
+def test_period_only_document_question_lists_documents_of_that_month(env: SimpleNamespace) -> None:
+    """측정에서 찾은 문제: 검색어('2020년 12월', '연혁')가 본문에 없어 일치 0건이 됐다. 기간만으로 목록을 뽑는다."""
+    llm = ScriptedLLM(
+        plan(intent="history", card_ids=["history"]),  # sql도 search_terms도 비어 있다
+        {"answer": "그달의 기록이 있어요.", "answers_question": True},
+    )
+    card = run(make(env, llm).ask("기관 연혁에서 2015년 12월에는 무슨 일이 있었어?"))
+    assert card.status == "answered"
+    assert card.documents
+    assert {d["date"] for d in card.documents} == {"2015-12"}
+    assert card.sources[0]["id"] == "history"
+    assert "총 " in llm.calls[1][1]  # 코드가 센 요약이 설명 프롬프트에 있다
+
+
+def test_search_terms_that_match_nothing_fall_back_to_the_period(env: SimpleNamespace) -> None:
+    llm = ScriptedLLM(
+        plan(intent="history", card_ids=["history"], search_terms=["2015년 12월", "연혁"]),
+        {"answer": "그달의 기록이 있어요.", "answers_question": True},
+    )
+    card = run(make(env, llm).ask("기관 연혁에서 2015년 12월에는 무슨 일이 있었어?"))
+    assert card.status == "answered"
+    assert {d["date"] for d in card.documents} == {"2015-12"}
+    assert card.meta["llm_calls"] == 2
+
+
+def test_empty_plan_without_a_period_is_still_rejected(env: SimpleNamespace) -> None:
+    """기간이 없으면 sql·검색어가 모두 빈 계획은 근거 없는 '답할 수 있음'이라 거부한다(재계획)."""
+    bad = plan(intent="history", card_ids=["history"])
+    llm = ScriptedLLM(bad, bad)
+    card = run(make(env, llm).ask("기관 연혁을 알려줘"))
+    assert card.status == "unknown"
+    assert card.meta["llm_calls"] == 2
+
+
+def test_parse_plan_period_ok_flag(env: SimpleNamespace) -> None:
+    cands = {i: env.catalog.get(i) for i in ("history", "15133891")}
+    empty_docs = plan(card_ids=["history"])
+    with pytest.raises(planner.PlanError):
+        planner.parse_plan(empty_docs, cands)
+    assert planner.parse_plan(empty_docs, cands, period_ok=True).search_terms == ()
+    with pytest.raises(planner.PlanError):  # 기간이 있어도 문서 출처가 아니면 소용없다
+        planner.parse_plan(plan(card_ids=["15133891"]), cands, period_ok=True)

@@ -90,3 +90,11 @@ def test_rate_and_summary_format() -> None:
     assert ev.rate([True, False, None]) == "1/2 (50%)"
     assert ev.rate([None]) == "해당 없음"
     assert json.loads(Path(gen.OUT).read_text(encoding="utf-8").splitlines()[0])["id"] == "dev01"
+
+
+def test_allowed_abbreviation_expansion_is_not_a_wrong_fix() -> None:
+    """질문에 쓴 공식 약칭(한체산)을 풀어 읽는 것은 설계된 동작이라 '잘못 고친 수'에 세지 않는다."""
+    q = next(x for x in QUESTIONS if x["id"] == "dev14")
+    expanded = "'한체산'을(를) '한국체육산업개발'(으)로 읽었어요"
+    assert ev.grade(q, card(status="answered", corrections=[expanded]))["wrong_fixes"] == []
+    assert ev.grade(q, card(status="answered", corrections=["'가'을(를) '나'(으)로 읽었어요"]))["wrong_fixes"] != []

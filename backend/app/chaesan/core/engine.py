@@ -56,7 +56,7 @@ from app.chaesan.core.planner import (
     schema_lines,
 )
 from app.chaesan.core.ports import DB, LLM, Clock, DemandSink, LLMError
-from app.chaesan.core.search import Hit, boosted_sources, search_docs
+from app.chaesan.core.search import Hit, SearchResult, boosted_sources, list_docs_in_period, search_docs
 from app.chaesan.core.sql_guard import SqlRejected, validate_sql
 from app.chaesan.core.when import Prefer, When, parse_when
 
@@ -123,6 +123,7 @@ class _Evidence:
     hits: list[Hit] = field(default_factory=list)
     cards: list[Card] = field(default_factory=list)
     # 문서 검색 전체에 대한 요약(코드가 센 값): 상위 몇 건이 아니라 일치한 모든 문서 기준
+    sql: str | None = None  # 코드가 검사하고 실행한 SQL(설명 LLM이 결과 열의 뜻을 알도록 보여 준다)
     total: int = 0
     first_date: str | None = None
     last_date: str | None = None
@@ -274,7 +275,8 @@ class Engine:
             # 재계획은 온도를 올린다: 온도 0이면 같은 입력에 같은 출력이 나와 거부된 계획을 그대로 되풀이한다(실제 모델에서 관찰)
             temperature = 0.0 if attempt == 0 else 0.4
             try:
-                plan = parse_plan(await self._llm_json(ctx, parts, PLAN_SCHEMA, PLAN_MAX_TOKENS, temperature), cands)
+                data = await self._llm_json(ctx, parts, PLAN_SCHEMA, PLAN_MAX_TOKENS, temperature)
+                plan = parse_plan(data, cands, period_ok=bool(when and when.start and when.end))
                 if not plan.answerable:
                     return plan, None
                 return plan, await self._execute(plan, q, when, cands, ctx)
@@ -302,31 +304,44 @@ class Engine:
             ctx.rows_read += res.rows_read
             logger.info("chaesan query rows_read=%d rows=%d", res.rows_read, len(res.rows))
             ev.rows = res.rows[:SQL_ROW_LIMIT]
+            ev.sql = sql
             words = set(re.findall(r"[a-z0-9_]+", sql.lower()))
             used.update({c.id: c for c in cands.values() if any(t.lower() in words for t in c.tables)})
-        if plan.search_terms:
-            sources = [i for i in plan.card_ids if i in DOC_SOURCES]
-            names = {i: terms for i, terms in self._boost_names.items() if i in sources}
-            res_docs = await search_docs(
-                self._db,
-                plan.search_terms,
-                weights=self._weights,
-                source_ids=sources,
-                boosted=boosted_sources(q, names),
-                start=when.start if when else None,
-                end=when.end if when else None,
-                order=self._order(q, plan.intent),
-                limit=DOC_HITS,
-            )
-            ctx.rows_read += res_docs.rows_read
-            ev.hits = res_docs.hits
-            ev.total, ev.first_date, ev.last_date, ev.capped = (
-                res_docs.total,
-                res_docs.first_date,
-                res_docs.last_date,
-                res_docs.capped,
-            )
-            used.update({h.source_id: cands[h.source_id] for h in ev.hits if h.source_id in cands})
+        sources = [i for i in plan.card_ids if i in DOC_SOURCES]
+        period = when is not None and when.start is not None and when.end is not None
+        if sources and (plan.search_terms or period):
+            order = self._order(q, plan.intent)
+            docs: SearchResult | None = None
+            if plan.search_terms:
+                names = {i: terms for i, terms in self._boost_names.items() if i in sources}
+                docs = await search_docs(
+                    self._db,
+                    plan.search_terms,
+                    weights=self._weights,
+                    source_ids=sources,
+                    boosted=boosted_sources(q, names),
+                    start=when.start if when else None,
+                    end=when.end if when else None,
+                    order=order,
+                    limit=DOC_HITS,
+                )
+                ctx.rows_read += docs.rows_read
+            if (docs is None or not docs.hits) and period and when is not None:
+                # 검색어가 문서 본문에 없어도(예: '2020년 12월', '연혁') 코드가 해석한 기간만으로 목록을 뽑는다
+                docs = await list_docs_in_period(
+                    self._db,
+                    weights=self._weights,
+                    source_ids=sources,
+                    start=when.start,
+                    end=when.end,
+                    order=order,
+                    limit=DOC_HITS,
+                )
+                ctx.rows_read += docs.rows_read
+            if docs is not None:
+                ev.hits = docs.hits
+                ev.total, ev.first_date, ev.last_date, ev.capped = docs.total, docs.first_date, docs.last_date, docs.capped
+                used.update({h.source_id: cands[h.source_id] for h in ev.hits if h.source_id in cands})
         ev.cards = list(used.values())
         return ev
 
@@ -369,7 +384,13 @@ class Engine:
         try:
             data = await self._llm_json(
                 ctx,
-                build_explain_prompt(q, self._evidence_lines(ev, names), caveats, schema_lines(ev.cards)),
+                build_explain_prompt(
+                    q,
+                    self._evidence_lines(ev, names),
+                    caveats,
+                    schema_lines(ev.cards),
+                    [guard.sanitize_untrusted(ev.sql, 400)[0]] if ev.sql else [],
+                ),
                 ANSWER_SCHEMA,
                 ANSWER_MAX_TOKENS,
                 0.2,

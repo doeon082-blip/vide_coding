@@ -172,7 +172,9 @@ def build_plan_prompt(
         "⑤ card_ids에는 실제로 쓰는 후보의 id를 모두 적는다. "
         "⑥ sql은 SELECT 한 문장만 쓴다(세미콜론으로 문장을 잇지 않는다). 여러 표가 필요해도 가장 알맞은 표 하나만 고른다. "
         "⑦ 질문이 묻는 대상(혼잡도, 이용 인원, 가격 등)을 직접 담은 열이 후보에 없으면, "
-        "정원·금액처럼 뜻이 다른 열로 대신 답하지 말고 answerable=false로 한다."
+        "정원·금액처럼 뜻이 다른 열로 대신 답하지 말고 answerable=false로 한다. "
+        "⑧ SQL의 집계·계산 열에는 AS 별칭을 붙여 값의 뜻이 드러나게 한다(예: SUM(users) AS total_users). "
+        "⑨ 코드가 해석한 기간만으로 문서를 찾는 질문은 search_terms를 비워도 된다."
     )
     if feedback:
         instruction += f"\n이전 계획이 거부되었다(사유: {feedback}). 후보와 규칙에 맞게 다시 만든다."
@@ -188,8 +190,10 @@ class Plan:
     search_terms: tuple[str, ...]
 
 
-def parse_plan(data: Mapping[str, Any], candidates: Mapping[str, Card]) -> Plan:
-    """LLM의 계획을 검증해 Plan으로 만든다. 후보 밖의 id, 잘못된 형식, 근거 없는 '답할 수 있음'은 PlanError."""
+def parse_plan(data: Mapping[str, Any], candidates: Mapping[str, Card], *, period_ok: bool = False) -> Plan:
+    """LLM의 계획을 검증해 Plan으로 만든다. 후보 밖의 id, 잘못된 형식, 근거 없는 '답할 수 있음'은 PlanError.
+    period_ok: 코드가 질문에서 기간을 해석했을 때. 문서 출처를 고르고 sql·search_terms가 모두 비어도
+    '기간으로 목록'으로 받아들인다."""
     intent = data.get("intent")
     if intent not in INTENTS:
         raise PlanError("intent가 올바르지 않다")
@@ -214,6 +218,6 @@ def parse_plan(data: Mapping[str, Any], candidates: Mapping[str, Card]) -> Plan:
     kept = tuple(t.strip() for t in terms[:6] if t.strip())
     if kept and not any(i in DOC_SOURCES for i in chosen):
         raise PlanError("선택한 데이터는 문서 검색 대상이 아니다")
-    if not sql.strip() and not kept:
+    if not sql.strip() and not kept and not (period_ok and any(i in DOC_SOURCES for i in chosen)):
         raise PlanError("sql 또는 search_terms가 필요하다")
     return Plan(str(intent), True, chosen, sql.strip(), kept)

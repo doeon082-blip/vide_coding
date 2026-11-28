@@ -301,3 +301,47 @@ def test_summary_and_date_orders(db: SqliteDB) -> None:
     assert not r.capped
     none = find(db, ["존재하지않는낱말xyz"])
     assert (none.total, none.first_date, none.last_date) == (0, None, None)
+
+
+@needs_data
+def test_list_docs_in_period(db: SqliteDB) -> None:
+    """검색어 없이 코드가 해석한 기간만으로 문서를 나열한다('○년 ○월에 무슨 일')."""
+    r = run(S.list_docs_in_period(db, weights=WEIGHTS, source_ids=["history"], start=date(2015, 12, 1), end=date(2015, 12, 31)))
+    assert r.total >= 1
+    assert {h.doc_date for h in r.hits} == {"2015-12"}
+    assert r.first_date == r.last_date == "2015-12"
+    assert all(h.matched_terms == () for h in r.hits)
+    # 여러 해에 걸친 기간과 정렬
+    wide = run(
+        S.list_docs_in_period(
+            db, weights=WEIGHTS, source_ids=["history"], start=date(2000, 1, 1), end=date(2009, 12, 31), order="date_asc", limit=5
+        )
+    )
+    assert wide.total > 5
+    assert [h.doc_date for h in wide.hits] == sorted(h.doc_date or "" for h in wide.hits)
+    desc = run(
+        S.list_docs_in_period(
+            db,
+            weights=WEIGHTS,
+            source_ids=["history"],
+            start=date(2000, 1, 1),
+            end=date(2009, 12, 31),
+            order="date_desc",
+            limit=3,
+        )
+    )
+    assert desc.hits[0].doc_date == desc.last_date
+    assert (desc.total, desc.first_date, desc.last_date) == (wide.total, wide.first_date, wide.last_date)
+
+
+@needs_data
+def test_list_docs_in_period_edge_cases(db: SqliteDB) -> None:
+    kw: dict[str, Any] = {"weights": WEIGHTS, "start": date(2015, 12, 1), "end": date(2015, 12, 31)}
+    assert run(S.list_docs_in_period(db, source_ids=[], **kw)).hits == []  # 출처가 없으면 아무것도 읽지 않는다
+    assert (
+        run(S.list_docs_in_period(db, source_ids=["history"], weights=WEIGHTS, start=None, end=None)).hits == []
+    )  # 기간이 없으면 안 한다
+    assert run(S.list_docs_in_period(db, source_ids=["history"], limit=0, **kw)).hits == []
+    assert run(S.list_docs_in_period(db, source_ids=["15143220"], **kw)).hits == []  # 날짜 칸이 없는 문서는 기간 조건에서 빠진다
+    far = run(S.list_docs_in_period(db, source_ids=["history"], weights=WEIGHTS, start=date(1850, 1, 1), end=date(1850, 12, 31)))
+    assert (far.total, far.first_date) == (0, None)

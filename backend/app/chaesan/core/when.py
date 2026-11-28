@@ -38,6 +38,9 @@ _DAY = r"(?:\s*(3[01]|[12]\d|0?[1-9])\s*일(?!\s*요))?"
 _YEAR_MONTH = re.compile(r"(?<!\d)((?:19|20)\d{2})\s*년\s*(1[0-2]|0?[1-9])\s*월" + _DAY)
 _YEAR = re.compile(r"(?<!\d)((?:19|20)\d{2})\s*년")
 _MONTH = re.compile(r"(?<!\d)(1[0-2]|0?[1-9])\s*월" + _DAY)
+# '가장 최근 보도자료'의 '최근'은 기간(최근 30일)이 아니라 순서(가장 늦은 것)다.
+# 기간 창으로 읽으면 마지막 자료가 창 밖일 때 빈 결과가 된다.
+_SUPERLATIVE = re.compile(r"(?:가장|제일|맨|젤)\s*(?:최근|늦|마지막)|최신|마지막|방금")
 _DAY_OF_WEEK = re.compile(r"([월화수목금토일])요일")
 
 
@@ -127,7 +130,7 @@ def _period(msg: str, today: date, data_range: tuple[date, date] | None, prefer:
     if m:
         y = int(m.group(1))
         return When(date(y, 1, 1), date(y, 12, 31), f"{y}년")
-    if "요즘" in msg or "최근" in msg:
+    if ("요즘" in msg or "최근" in msg) and not _SUPERLATIVE.search(msg):
         return When(today - timedelta(days=30), today, "최근 30일")
     if re.search(r"오늘|지금|현재", msg):
         return When(today, today, "오늘")

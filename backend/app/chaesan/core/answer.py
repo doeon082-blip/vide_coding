@@ -151,13 +151,19 @@ ANSWER_SCHEMA: Final[dict[str, Any]] = {
 
 
 def build_explain_prompt(
-    question: str, evidence_lines: Sequence[str], caveats: Sequence[str], schema: Sequence[str] = ()
+    question: str,
+    evidence_lines: Sequence[str],
+    caveats: Sequence[str],
+    schema: Sequence[str] = (),
+    queries: Sequence[str] = (),
 ) -> tuple[str, str, str]:
     """(임무 문장, 데이터 블록, 지시문). 채산 말투는 여기(설명 생성 프롬프트)에만 둔다: 말투를 바꾸는 별도 LLM 호출을 만들면
     호출 수와 숫자가 변형될 위험이 늘기 때문이다."""
     data = "[질문] " + question + "\n[근거]\n" + "\n".join(evidence_lines)
     if schema:
         data += "\n[자료 설명: 열 이름과 뜻]\n" + "\n".join(schema)
+    if queries:
+        data += "\n[조회한 SQL: 코드가 검사하고 실행한 것]\n" + "\n".join(queries)
     if caveats:
         data += "\n[주의점]\n" + "\n".join(f"- {c[:120]}" for c in caveats[:3])
     instruction = (
@@ -165,9 +171,12 @@ def build_explain_prompt(
         'JSON {"answer": "...", "answers_question": true|false}만 출력한다. '
         "숫자와 날짜는 [근거]에 있는 것만 아라비아 숫자(0~9)로 쓰고, 직접 계산하거나 합치지 않는다. "
         "[근거]에 없는 내용은 말하지 않는다. 근거가 문서 제목뿐이면 내용을 지어내지 말고 '기록에 따르면'처럼 말한다. "
-        "열의 뜻은 [자료 설명]을 따른다. 질문의 말(붐빈다, 많다)을 근거의 수량(대수, 인원, 건수)으로 읽을 수 있으면 답하되, "
-        "어떤 수량을 기준으로 읽었는지 답에 밝힌다. 근거의 열이 질문이 묻는 것과 뜻이 다르거나 질문에 직접 답하지 못하면 "
-        "answers_question=false로 하고 answer에 '이 자료로는 알 수 없어요'라고 쓴다. "
+        "열의 뜻은 [자료 설명]을 따른다. 결과 열 이름이 SUM(users)처럼 모호하면 [조회한 SQL]의 조건과 계산이 그 값의 뜻이다: "
+        "그 계산이 질문의 조건을 그대로 구했다면 그 값으로 답한다. 질문의 말(붐빈다, 많다)을 근거의 수량(대수, 인원, 건수)으로 "
+        "읽을 수 있으면 답하되, 어떤 수량을 기준으로 읽었는지 답에 밝힌다. "
+        "[주의점]은 답에 '단위는 확인되지 않았어요'처럼 짧게 덧붙이되, 그 때문에 answers_question을 false로 하지 않는다. "
+        "answers_question=false는 근거의 열이 질문이 묻는 것과 종류가 다를 때(예: 금액 열로 인원을 답해야 할 때)나 "
+        "근거가 비었을 때만 쓰고, 그때 answer에는 '이 자료로는 알 수 없어요'라고 쓴다. "
         "[요약]이 있으면 그것이 전체 일치 문서에 대한 사실이다: "
         "'언제부터·처음'에는 '가장 이른 날짜', '최근·마지막'에는 '가장 늦은 날짜', '몇 건'에는 '총 건수'를 쓴다. "
         "말투는 채산: 짧고 친절한 존댓말('~예요', '~했어요'). 링크·URL·SQL은 쓰지 않는다."

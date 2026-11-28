@@ -18,6 +18,9 @@ from app.chaesan.core.ports import LLMError, LLMResult
 
 logger = logging.getLogger(__name__)
 PUBLIC_ERROR = "AI 서비스를 일시적으로 사용할 수 없습니다."
+# 참고(측정): 프롬프트가 같으면 온도 0에서 출력이 같다(seed 유무와 무관).
+# 같은 질문의 결과가 실행마다 달라지는 것은 프롬프트에 매번 새로 넣는 1회용 난수(데이터 구분자 nonce, 유출 감지 canary) 때문이다.
+# 보안 장치라 없애지 않으므로 정확도는 3회 반복의 범위로 잰다.
 
 
 class OllamaLLM:

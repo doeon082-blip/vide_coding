@@ -221,3 +221,28 @@ def test_real_functions_fix_obvious_typos(typed: str, fixed: str) -> None:
 def test_real_functions_leave_numbers_and_known_words() -> None:
     r = real().correct("2024년 7월 인라인 10만명")
     assert r.text == "2024년 7월 인라인 10만명" and not r.corrections
+
+
+_HADA_VOCAB = Vocab({"주차": 9, "수영": 9, "수영장": 5, "테니스장": 3}, {})
+
+
+@pytest.mark.parametrize(
+    "text", ["주차한", "주차했어", "주차하는", "수영했어요", "수영하고", "수영하면", "주차해서", "주차합니다"]
+)
+def test_hada_verb_forms_are_not_typos(text: str) -> None:
+    """실제 모델 측정에서 찾은 문제: '주차한'이 '주차장' 오타로 의심되어 되묻기가 됐다(자모 거리 2)."""
+    r = Corrector(_HADA_VOCAB).correct(f"올림픽공원에 {text} 차는 몇 대야?")
+    assert not r.suggestions
+    assert not r.corrections
+
+
+def test_hada_rule_does_not_hide_real_typos() -> None:
+    r = Corrector(_HADA_VOCAB).correct("수영징 알려줘")
+    assert [c.corrected for c in r.corrections] == ["수영장"]
+    assert Corrector(_HADA_VOCAB).correct("테니스짱").text == "테니스장"
+
+
+def test_hada_rule_with_adversarial_distance_function() -> None:
+    always = Corrector(_HADA_VOCAB, jamo=lambda s: s, distance=lambda a, b: 1)  # 모든 낱말이 후보와 1칸 차이라고 우기는 극단
+    assert not always.correct("주차한").corrections
+    assert not always.correct("수영하는").corrections

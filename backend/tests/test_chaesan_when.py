@@ -105,3 +105,18 @@ def test_date_weekday_conflict_is_flagged() -> None:
     assert w is not None and not w.conflict
     w = parse_when("7월 주말", TODAY)  # 한 달에는 주말이 있다
     assert w is not None and not w.conflict
+
+
+@pytest.mark.parametrize(
+    "msg", ["가장 최근 보도자료는 언제 배포했어?", "제일 최근 소식", "최신 기사는?", "마지막 보도는 언제야", "가장 늦은 날짜"]
+)
+def test_superlative_recent_is_an_order_not_a_window(msg: str) -> None:
+    """실제 모델 측정에서 찾은 문제: '가장 최근'을 '최근 30일'로 읽어 마지막 자료가 창 밖이면 빈 결과가 됐다."""
+    assert parse_when(msg, TODAY) is None
+
+
+@pytest.mark.parametrize("msg", ["요즘 행사", "최근 행사 알려줘", "최근 소식"])
+def test_plain_recent_is_still_a_30_day_window(msg: str) -> None:
+    w = parse_when(msg, TODAY)
+    assert w is not None
+    assert w.label == "최근 30일"
