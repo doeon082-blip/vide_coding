@@ -1,13 +1,72 @@
-﻿<!doctype html>
+<!doctype html>
+<!-- 채산 화면 뼈대. 인라인 스크립트·스타일이 없다(CSP가 'self'만 허용). 경로는 모두 상대 경로라 어느 주소 아래에 올려도 동작한다. -->
 <html lang="ko">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>전국 축제 정보</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<!-- 서버 헤더를 붙일 수 없는 정적 호스팅(GitHub Pages)에서도 같은 제한이 적용되게 하는 한 겹 더(서버 헤더와 같은 내용, frame-ancestors는 meta로 못 씀) -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="description" content="한국체육산업개발의 개방 데이터와 공개 기록을 근거로, 출처와 함께 답하는 비공식 안내 서비스">
+<title>채산 · 한체산 데이터 길라잡이 (비공식)</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/layout.css">
+<link rel="stylesheet" href="css/card.css">
+<script type="module" src="js/main.js"></script>
+</head>
+<body>
+<a class="skip" href="#q">질문창으로 바로 가기</a>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="./" aria-label="채산 처음으로">
+      <img class="brand-mark" src="img/mark.svg" alt="" width="30" height="30">
+      <span class="brand-name">채산</span>
+      <span class="tag">비공식</span>
+    </a>
+    <button id="new-chat" type="button" class="btn-ghost" hidden>
+      <i class="icon icon-plus" aria-hidden="true"></i><span>새 대화</span>
+    </button>
+  </div>
+</header>
+
+<main class="stage">
+  <p id="offline-banner" class="banner" hidden>서버 없이 보는 예비 화면이에요. 예시 질문의 미리 계산한 답만 볼 수 있어요.</p>
+
+  <section id="hero" class="hero" aria-labelledby="hero-title">
+    <picture class="hero-art">
+      <source media="(prefers-color-scheme: dark)" srcset="img/hero-dark.svg">
+      <img src="img/hero-light.svg" alt="" width="720" height="300" decoding="async">
+    </picture>
+    <div class="hero-body">
+      <p class="eyebrow">한국체육산업개발 공개 자료 길라잡이</p>
+      <h1 id="hero-title">무엇이 궁금하세요?</h1>
+      <p class="lead">개방된 데이터와 기관 기록을 찾아 <strong>출처와 함께</strong> 답해요. 근거가 없으면 지어내지 않고 "모른다"고 말해요.</p>
+    </div>
+    <h2 class="section-label" id="sg-title">이런 걸 물어볼 수 있어요</h2>
+    <div id="suggestions" class="suggestions" aria-labelledby="sg-title"></div>
+    <ul class="trust" aria-label="채산이 지키는 약속">
+      <li><b>출처를 보여 줘요</b><span>데이터 이름·번호·기간</span></li>
+      <li><b>모르면 모른다고 해요</b><span>근거 없는 답은 만들지 않아요</span></li>
+      <li><b>숫자는 코드가 확인해요</b><span>AI가 쓴 숫자를 자료와 대조해요</span></li>
+      <li><b>질문은 저장하지 않아요</b><span>대화는 이 화면에만 남아요</span></li>
+    </ul>
+  </section>
+
+  <ol id="thread" class="thread" role="log" aria-live="polite" aria-relevant="additions" aria-label="대화"></ol>
+</main>
+
+<footer class="dock">
+  <form id="ask-form" class="composer" autocomplete="off">
+    <label class="sr-only" for="q">궁금한 것을 물어보세요</label>
+    <textarea id="q" name="q" rows="1" maxlength="200" enterkeyhint="send" aria-describedby="dock-hint"
+              placeholder="궁금한 걸 물어보세요"></textarea>
+    <span id="counter" class="counter" aria-hidden="true"></span>
+    <button id="send" type="submit" class="send" aria-label="질문 보내기" disabled><i class="icon icon-send" aria-hidden="true"></i></button>
+  </form>
+  <p id="dock-hint" class="dock-hint"><strong>비공식</strong> 서비스 · 답은 틀릴 수 있어요 · 각 질문은 따로 답해요</p>
+</footer>
+<noscript><p class="banner">이 화면은 자바스크립트가 있어야 동작해요.</p></noscript>
+</body>
 </html>

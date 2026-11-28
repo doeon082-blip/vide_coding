@@ -1,29 +1,9 @@
 {
-  "name": "frontend",
+  "name": "chaesan-web",
   "private": true,
-  "version": "0.0.0",
   "type": "module",
+  "description": "채산 화면. 빌드·의존성 없음. package.json은 node가 .js를 ES 모듈로 읽고 npm test로 시험하게 하려고 둔다.",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "lint": "oxlint",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "@tailwindcss/vite": "^4.3.5",
-    "daisyui": "^5.8.2",
-    "lucide-react": "^1.81.0",
-    "react": "^19.3.1",
-    "react-dom": "^19.3.1",
-    "tailwindcss": "^4.3.5"
-  },
-  "devDependencies": {
-    "@types/node": "^24.19.2",
-    "@types/react": "^19.3.0",
-    "@types/react-dom": "^19.3.0",
-    "@vitejs/plugin-react": "^6.1.2",
-    "oxlint": "^1.90.0",
-    "typescript": "~7.0.2",
-    "vite": "^8.3.6"
+    "test": "node --test tests/"
   }
 }

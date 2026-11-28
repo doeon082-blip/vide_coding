@@ -1,32 +1,41 @@
-# React + TypeScript + Vite
+# 채산 화면 (frontend)
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+한국체육산업개발 공개 자료로 답하는 **비공식** 안내 서비스 "채산"의 화면입니다.
+**빌드가 없습니다.** HTML + CSS + 순수 자바스크립트(ES 모듈)이고 npm 패키지에 의존하지 않습니다. 파일을 그대로 열어 구조를 볼 수 있습니다.
 
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+## 구조
+```
+index.html            뼈대(채팅형 화면). 인라인 코드 없음, CSP 메타 포함
+css/                  base(색·글자·갈래 색) / layout(배치·입력창) / card(말풍선·그래프·표)
+js/main.js            시작점: 이벤트 연결, 질문 흐름
+js/state.js           상태 하나와 상태를 바꾸는 순수 함수(대화는 메모리에만, 저장하지 않음)
+js/api.js             서버 호출(POST api/chaesan/ask), 30초 제한, 오류 분류
+js/render.js          render(state): 대화 영역을 통째로 다시 그림
+js/components.js      말풍선·답변 카드·막대 그래프·표·목록(값을 받아 요소를 돌려주는 함수)
+js/view-model.js      서버 응답 → 화면 값(DOM 없음). 숫자 미확인이면 한 줄 답을 숨김
+js/lib/               dom(textContent만 쓰는 요소 생성) / safe-url(https+허용 도메인) / format / lane / mode
+img/                  직접 그린 공원 일러스트(밝은·어두운 판), 갈래 아이콘, 로고
+data/examples.json    실제 엔진이 낸 미리 계산한 답 10개(backend/eval/build_examples.py가 생성)
+tests/                node --test 시험(링크 검사·값 정리·서버 호출·상태·예비 모드)
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## 실행
+서버와 같은 주소로 열립니다(CORS 설정 불필요). 저장소 루트에서:
+```bash
+cd backend
+uv run uvicorn app.chaesan.local.app:app --port 8100 --no-proxy-headers
+# 브라우저: http://localhost:8100/
+```
+서버 없이 보려면 `?offline=1`을 붙입니다(미리 계산한 예시 답만 동작). GitHub Pages 같은 `*.github.io` 주소는 자동으로 이 모드입니다.
+
+## 시험
+```bash
+cd frontend
+npm test        # node --test tests/ (의존성 설치 없음)
+```
+
+## 지키는 규칙
+- 서버가 준 글자는 `textContent`로만 넣습니다(`innerHTML` 등 금지). 링크는 `https` + `data.go.kr`·`ksponco.or.kr`·`alio.go.kr`만.
+- 외부 CDN·글꼴·추적 스크립트 없음. 질문 원문은 브라우저 저장소·서버에 저장하지 않습니다.
+- 스타일은 CSS 클래스로만 바꿉니다(CSP가 인라인 스타일을 막음).
+- 모든 화면에 "비공식 서비스"를 표시합니다. 기관 로고·색을 흉내 내지 않습니다.

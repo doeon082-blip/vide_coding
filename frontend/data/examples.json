@@ -1,0 +1,964 @@
+{
+  "generated_at": "2026-11-28T18:37:35+09:00",
+  "examples": [
+    {
+      "lane": "역사",
+      "question": "한체산은 언제 설립됐어?",
+      "response": {
+        "status": "answered",
+        "answer": "한국체육산업개발은 1990-07에 설립되었어요.",
+        "evidence_kind": "documents",
+        "evidence_rows": [],
+        "documents": [
+          {
+            "title": "회사설립(자본금: 6억원)<br /> 올림픽공원 스포츠교실 운영<br />(제1체육관, 수영장, 테니스장, 선수촌 S/C)<br /> 올림픽공원 및 조정경기장 시설·경비·미화관리",
+            "date": "1990-07",
+            "source": "기관 연혁(누리집)",
+            "url": "https://www.ksponco.or.kr/menu.es?mid=a10601030000",
+            "body_available": true
+          }
+        ],
+        "sources": [
+          {
+            "id": "history",
+            "name": "기관 연혁(누리집)",
+            "period": "1990-07~2026-07",
+            "url": "https://www.ksponco.or.kr/menu.es?mid=a10601030000"
+          }
+        ],
+        "badges": [
+          "2026년 7월 자료"
+        ],
+        "corrections": [
+          "'한체산'을(를) '한국체육산업개발'(으)로 읽었어요"
+        ],
+        "unsupported_numbers": [],
+        "notice": "채산은 한국체육산업개발의 공식 서비스가 아닌 비공식 안내입니다.",
+        "meta": {
+          "intent": "history"
+        }
+      }
+    },
+    {
+      "lane": "시설·이용",
+      "question": "올림픽공원에서 자전거를 탈 수 있어요?",
+      "response": {
+        "status": "answered",
+        "answer": "네, 자전거로 출입할 경우 오전 5시부터 밤 10시까지 이용할 수 있어요.",
+        "evidence_kind": "documents",
+        "evidence_rows": [],
+        "documents": [
+          {
+            "title": "올림픽공원 이용시간이 어떻게 되나요",
+            "date": "2024-07-09",
+            "source": "자주 묻는 질문정보",
+            "url": null,
+            "body_available": true
+          },
+          {
+            "title": "평화의 광장에서 인라인/자전거 타고 싶은데 대여해 주는 곳이 있나요",
+            "date": "2024-07-09",
+            "source": "자주 묻는 질문정보",
+            "url": null,
+            "body_available": true
+          },
+          {
+            "title": "올림픽공원내 자전거 이용에 대하여",
+            "date": "2024-07-09",
+            "source": "자주 묻는 질문정보",
+            "url": null,
+            "body_available": true
+          },
+          {
+            "title": "올림픽공원 수영장 수질관리 형태 및 온도는 몇 도를 유지하는지 궁금합니다",
+            "date": "2024-07-09",
+            "source": "자주 묻는 질문정보",
+            "url": null,
+            "body_available": true
+          },
+          {
+            "title": "올림픽공원 촬영문의 드립니다",
+            "date": "2024-09-19",
+            "source": "자주 묻는 질문정보",
+            "url": null,
+            "body_available": true
+          },
+          {
+            "title": "올림픽공원에 사무실을 입주하고 싶은데 임대조건과 가능 여부에 대해 알려 주세요",
+            "date": "2024-07-09",
+            "source": "자주 묻는 질문정보",
+            "url": null,
+            "body_available": true
+          },
+          {
+            "title": "올림픽공원 내 음수대는 어디에 있나요",
+            "date": "2026-08-19",
+            "source": "자주 묻는 질문정보",
+            "url": null,
+            "body_available": true
+          },
+          {
+            "title": "올림픽공원 이용시 대중교통을 알고 싶습니다",
+            "date": "2024-07-09",
+            "source": "자주 묻는 질문정보",
+            "url": null,
+            "body_available": true
+          }
+        ],
+        "sources": [
+          {
+            "id": "15089962",
+            "name": "자주 묻는 질문정보",
+            "period": "2016-05-03~2026-08-19",
+            "url": "https://www.data.go.kr/data/15089962/fileData.do"
+          }
+        ],
+        "badges": [
+          "2026년 8월 자료"
+        ],
+        "corrections": [],
+        "unsupported_numbers": [],
+        "notice": "채산은 한국체육산업개발의 공식 서비스가 아닌 비공식 안내입니다.",
+        "meta": {
+          "intent": "facility"
+        }
+      }
+    },
+    {
+      "lane": "데이터",
+      "question": "올림픽공원 주차장에서 2024년 7월 시간대별 입차 합계는?",
+      "response": {
+        "status": "answered",
+        "answer": "2024년 7월 시간대별 입차 합계는 0시 316, 1시 226, 2시 165, 3시 216, 4시 602, 5시 8118, 6시 9100, 7시 7951, 8시 20762, 9시 16804, 10시 16386, 11시 10702, 12시 11742, 13시 15988, 14시 13283, 15시 14247, 16시 13653, 17시 13555, 18시 13747, 19시 11733이에요.",
+        "evidence_kind": "table",
+        "evidence_rows": [
+          {
+            "hour": 0,
+            "total_entries": 316
+          },
+          {
+            "hour": 1,
+            "total_entries": 226
+          },
+          {
+            "hour": 2,
+            "total_entries": 165
+          },
+          {
+            "hour": 3,
+            "total_entries": 216
+          },
+          {
+            "hour": 4,
+            "total_entries": 602
+          },
+          {
+            "hour": 5,
+            "total_entries": 8118
+          },
+          {
+            "hour": 6,
+            "total_entries": 9100
+          },
+          {
+            "hour": 7,
+            "total_entries": 7951
+          },
+          {
+            "hour": 8,
+            "total_entries": 20762
+          },
+          {
+            "hour": 9,
+            "total_entries": 16804
+          },
+          {
+            "hour": 10,
+            "total_entries": 16386
+          },
+          {
+            "hour": 11,
+            "total_entries": 10702
+          },
+          {
+            "hour": 12,
+            "total_entries": 11742
+          },
+          {
+            "hour": 13,
+            "total_entries": 15988
+          },
+          {
+            "hour": 14,
+            "total_entries": 13283
+          },
+          {
+            "hour": 15,
+            "total_entries": 14247
+          },
+          {
+            "hour": 16,
+            "total_entries": 13653
+          },
+          {
+            "hour": 17,
+            "total_entries": 13555
+          },
+          {
+            "hour": 18,
+            "total_entries": 13747
+          },
+          {
+            "hour": 19,
+            "total_entries": 11733
+          },
+          {
+            "hour": 20,
+            "total_entries": 10334
+          },
+          {
+            "hour": 21,
+            "total_entries": 3820
+          },
+          {
+            "hour": 22,
+            "total_entries": 1481
+          },
+          {
+            "hour": 23,
+            "total_entries": 597
+          }
+        ],
+        "documents": [],
+        "sources": [
+          {
+            "id": "15138735",
+            "name": "올림픽공원 입출차 정보",
+            "period": "2024-07-01~2024-07-31",
+            "url": "https://www.data.go.kr/data/15138735/fileData.do"
+          }
+        ],
+        "badges": [
+          "2024년 7월 자료",
+          "1년 넘게 갱신 안 됨",
+          "같은 기간 다른 자료와 값이 다를 수 있어요(주의점 참고)"
+        ],
+        "corrections": [],
+        "unsupported_numbers": [],
+        "notice": "채산은 한국체육산업개발의 공식 서비스가 아닌 비공식 안내입니다.",
+        "meta": {
+          "intent": "data"
+        }
+      }
+    },
+    {
+      "lane": "소식",
+      "question": "올림픽공원 새 소식을 알려줘",
+      "response": {
+        "status": "answered",
+        "answer": "기록에 따르면 2026-06-12에 올라온 주차장 이용 및 요금 안내를 포함하여 총 46건의 소식이 있어요.",
+        "evidence_kind": "documents",
+        "evidence_rows": [],
+        "documents": [
+          {
+            "title": "올림픽공원 주차장 이용 및 요금 안내",
+            "date": "2026-06-12",
+            "source": "올림픽공원 핫뉴스 정보",
+            "url": "https://www.ksponco.or.kr/olympicpark/board.es?mid=a20601000000&bid=0045&list_no=84077&act=view",
+            "body_available": false
+          },
+          {
+            "title": "올림픽공원 자전거 운영 중지 안내(2026.5.23~5.24)",
+            "date": "2026-05-21",
+            "source": "올림픽공원 핫뉴스 정보",
+            "url": "https://www.ksponco.or.kr/olympicpark/board.es?mid=a20601000000&bid=0045&list_no=83911&act=view",
+            "body_available": false
+          },
+          {
+            "title": "2026년 올림픽공원 버스킹 안내",
+            "date": "2026-05-20",
+            "source": "올림픽공원 핫뉴스 정보",
+            "url": "https://www.ksponco.or.kr/olympicpark/board.es?mid=a20601000000&bid=0045&list_no=83904&act=view",
+            "body_available": false
+          },
+          {
+            "title": "2026 올림픽공원 버스커 모집 안내",
+            "date": "2026-04-23",
+            "source": "올림픽공원 핫뉴스 정보",
+            "url": "https://www.ksponco.or.kr/olympicpark/board.es?mid=a20601000000&bid=0045&list_no=83676&act=view",
+            "body_available": false
+          },
+          {
+            "title": "올림픽공원 안내센터 및 방송실 설연휴 운영안내",
+            "date": "2026-02-10",
+            "source": "올림픽공원 핫뉴스 정보",
+            "url": "https://www.ksponco.or.kr/olympicpark/board.es?mid=a20601000000&bid=0045&list_no=83091&act=view",
+            "body_available": false
+          },
+          {
+            "title": "올림픽공원 유실물 QR 접수·조회 서비스 운영",
+            "date": "2025-11-24",
+            "source": "올림픽공원 핫뉴스 정보",
+            "url": "https://www.ksponco.or.kr/olympicpark/board.es?mid=a20601000000&bid=0045&list_no=82470&act=view",
+            "body_available": false
+          },
+          {
+            "title": "[올림픽공원 모범도시숲 선정기념] 올팍만의 숨은식물찾기 인증샷 이벤트 4탄",
+            "date": "2025-11-17",
+            "source": "올림픽공원 핫뉴스 정보",
+            "url": "https://www.ksponco.or.kr/olympicpark/board.es?mid=a20601000000&bid=0045&list_no=82434&act=view",
+            "body_available": false
+          },
+          {
+            "title": "올림픽공원 공사 안내",
+            "date": "2025-11-13",
+            "source": "올림픽공원 핫뉴스 정보",
+            "url": "https://www.ksponco.or.kr/olympicpark/board.es?mid=a20601000000&bid=0045&list_no=82419&act=view",
+            "body_available": false
+          }
+        ],
+        "sources": [
+          {
+            "id": "15090715",
+            "name": "올림픽공원 핫뉴스 정보",
+            "period": "2015-04-29~2026-06-19",
+            "url": "https://www.data.go.kr/data/15090715/fileData.do"
+          }
+        ],
+        "badges": [
+          "2026년 6월 자료",
+          "본문 없음, 원문 링크 확인"
+        ],
+        "corrections": [],
+        "unsupported_numbers": [],
+        "notice": "채산은 한국체육산업개발의 공식 서비스가 아닌 비공식 안내입니다.",
+        "meta": {
+          "intent": "news"
+        }
+      }
+    },
+    {
+      "lane": "기관 정보",
+      "question": "한체산 사전정보공표에는 어떤 자료가 있어?",
+      "response": {
+        "status": "answered",
+        "answer": "기록에 따르면 임직원 행동강령(2024.11.28 개정)과 2024년도 한국체육산업개발(주) 업무계획 등 계약구매 대분류의 자료들이 있어요.",
+        "evidence_kind": "table",
+        "evidence_rows": [
+          {
+            "major": "계약구매",
+            "minor": "임직원 행동강령",
+            "title": "임직원 행동강령(2024.11.28 개정)",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=78825&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "임직원 행동강령",
+            "title": "임직원 행동강령(2023.11.22. 개정)",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=75867&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "임직원 행동강령",
+            "title": "임직원 행동강령(2022.10.7. 개정)",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=74395&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "임직원 행동강령",
+            "title": "임직원 행동강령(2020년 개정전문)",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19585&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "임직원 행동강령",
+            "title": "임직원 행동강령(2019.12.30. 개정)",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19597&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "임직원 행동강령",
+            "title": "임직원 행동강령(2019년 개정전문)",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19441&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "임직원 행동강령",
+            "title": "임직원 행동강령 (2018년 개정전문)",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19430&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "임직원 행동강령",
+            "title": "임직원 행동강령 (2017년 개정전문)",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19429&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "임직원 행동강령",
+            "title": "임직원 행동강령",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19273&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "임직원 행동강령",
+            "title": "임직원 행동강령",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19099&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "임직원 행동강령",
+            "title": "임직원 행동강령",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19163&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "기관 및 부서별 업무계획",
+            "title": "2024년도 한국체육산업개발(주) 업무계획",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=77122&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "기관 및 부서별 업무계획",
+            "title": "2023년도 한국체육산업개발(주) 업무계획",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=73844&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "기관 및 부서별 업무계획",
+            "title": "2022년도 한국체육산업개발(주) 업무계획",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19596&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "기관 및 부서별 업무계획",
+            "title": "2021년도 한국체육산업개발(주) 업무계획",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19691&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "기관 및 부서별 업무계획",
+            "title": "2020년 회사 업무계획",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19379&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "기관 및 부서별 업무계획",
+            "title": "2019년 신년 업무계획보고",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19478&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "기관 및 부서별 업무계획",
+            "title": "2019년도 주요업무계획",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19335&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "기관 및 부서별 업무계획",
+            "title": "2019년도 주요업무계획(경영기획실)",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19334&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "기관 및 부서별 업무계획",
+            "title": "2019년도 주요업무계획(사업개발실)",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19333&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "기관 및 부서별 업무계획",
+            "title": "2019년도 주요업무계획(사업운영실)",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19477&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "기관 및 부서별 업무계획",
+            "title": "2019년도 주요업무계획(올림픽스포츠센터)",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19476&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "기관 및 부서별 업무계획",
+            "title": "2019년도 주요업무계획(시설관리실)",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19475&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "기관 및 부서별 업무계획",
+            "title": "2019년도 주요업무계획(사업지원실)",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19332&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "기관 및 부서별 업무계획",
+            "title": "2018년도 조경골프장관리팀 업무계획",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19530&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "기관 및 부서별 업무계획",
+            "title": "2018년도 공원관리팀 업무계획",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19512&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "기관 및 부서별 업무계획",
+            "title": "2018년도 경륜지원팀 업무계획",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19511&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "기관 및 부서별 업무계획",
+            "title": "2018년도 지점서비스팀 업무계획",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19510&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "기관 및 부서별 업무계획",
+            "title": "2018년 회사 업무보고계획",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19509&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "기관 및 부서별 업무계획",
+            "title": "2018년 일산올림픽스포츠센터 업무계획",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19508&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "기관 및 부서별 업무계획",
+            "title": "2018년 분당올림픽스포츠센터 업무계획",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19507&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "기관 및 부서별 업무계획",
+            "title": "2018년 사업운영실 업무계획",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19506&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "기관 및 부서별 업무계획",
+            "title": "2018년 시설관리실 업무계획",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19505&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "기관 및 부서별 업무계획",
+            "title": "2018년 사업개발실 업무계획",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19504&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "기관 및 부서별 업무계획",
+            "title": "2018년 경영기획실 업무계획",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19503&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "기관 및 부서별 업무계획",
+            "title": "2017년 사업운영실 업무계획",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19408&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "기관 및 부서별 업무계획",
+            "title": "2017년 일산올림픽스포츠센터 업무계획",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19468&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "기관 및 부서별 업무계획",
+            "title": "2017년 분당올림픽스포츠센터 업무계획",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19467&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "기관 및 부서별 업무계획",
+            "title": "2017년 시설관리실 업무계획",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19466&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "기관 및 부서별 업무계획",
+            "title": "2017년 사업개발실 업무계획",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19465&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "기관 및 부서별 업무계획",
+            "title": "2017년 경영기획실 업무계획",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19464&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "기관 및 부서별 업무계획",
+            "title": "2017년 회사 업무계획",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19407&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "기관 및 부서별 업무계획",
+            "title": "2016년 일산올림픽스포츠센터 업무계획",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19495&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "기관 및 부서별 업무계획",
+            "title": "2016년 분당올림픽스포츠센터 업무계획",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19494&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "기관 및 부서별 업무계획",
+            "title": "2016년 사업운영실 업무계획",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19493&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "기관 및 부서별 업무계획",
+            "title": "2016년 시설관리실 업무계획",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19491&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "기관 및 부서별 업무계획",
+            "title": "2016년 사업개발실 업무계획",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19490&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "기관 및 부서별 업무계획",
+            "title": "2016년 경영기획실 업무계획",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19489&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "기관 및 부서별 업무계획",
+            "title": "2016년 회사 업무계획",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19488&act=view"
+          },
+          {
+            "major": "계약구매",
+            "minor": "기관 및 부서별 업무계획",
+            "title": "2015년 일산올림픽스포츠센터 업무계획",
+            "url": "https://www.ksponco.or.kr/board.es?mid=a10103000000&bid=0057&list_no=19227&act=view"
+          }
+        ],
+        "documents": [],
+        "sources": [
+          {
+            "id": "15090257",
+            "name": "사전정보공표 정보",
+            "period": "2014-05-21~2026-06-29",
+            "url": "https://www.data.go.kr/data/15090257/fileData.do"
+          }
+        ],
+        "badges": [
+          "2026년 6월 자료"
+        ],
+        "corrections": [
+          "'한체산'을(를) '한국체육산업개발'(으)로 읽었어요"
+        ],
+        "unsupported_numbers": [],
+        "notice": "채산은 한국체육산업개발의 공식 서비스가 아닌 비공식 안내입니다.",
+        "meta": {
+          "intent": "org"
+        }
+      }
+    },
+    {
+      "lane": "역사",
+      "question": "한체산 연혁에서 2021년에는 어떤 일이 있었어?",
+      "response": {
+        "status": "answered",
+        "answer": "2021년에는 안정경영단 출범, 네이버클라우드·농협 서울지역본부·한국콘텐츠진흥원·송파경찰서와 업무협약을 체결했어요. 또한 올림픽공원 농산물 직거래장터 개최, ESG경영 노사 실천협약, 환경부장관상 수상 등의 일이 있었어요.",
+        "evidence_kind": "documents",
+        "evidence_rows": [],
+        "documents": [
+          {
+            "title": "안정경영단 출범",
+            "date": "2021-01",
+            "source": "기관 연혁(누리집)",
+            "url": "https://www.ksponco.or.kr/menu.es?mid=a10601030000",
+            "body_available": true
+          },
+          {
+            "title": "네이버클라우드와 업무협약 체결",
+            "date": "2021-02",
+            "source": "기관 연혁(누리집)",
+            "url": "https://www.ksponco.or.kr/menu.es?mid=a10601030000",
+            "body_available": true
+          },
+          {
+            "title": "농협 서울지역본부와 업무협약 체결",
+            "date": "2021-03",
+            "source": "기관 연혁(누리집)",
+            "url": "https://www.ksponco.or.kr/menu.es?mid=a10601030000",
+            "body_available": true
+          },
+          {
+            "title": "한국콘텐츠진흥원과 업무협약 체결",
+            "date": "2021-03",
+            "source": "기관 연혁(누리집)",
+            "url": "https://www.ksponco.or.kr/menu.es?mid=a10601030000",
+            "body_available": true
+          },
+          {
+            "title": "송파경찰서와 업무협약 체결",
+            "date": "2021-06",
+            "source": "기관 연혁(누리집)",
+            "url": "https://www.ksponco.or.kr/menu.es?mid=a10601030000",
+            "body_available": true
+          },
+          {
+            "title": "올림픽공원 농산물 직거래장터 개최",
+            "date": "2021-11",
+            "source": "기관 연혁(누리집)",
+            "url": "https://www.ksponco.or.kr/menu.es?mid=a10601030000",
+            "body_available": true
+          },
+          {
+            "title": "ESG경영 노사 실천협약",
+            "date": "2021-11",
+            "source": "기관 연혁(누리집)",
+            "url": "https://www.ksponco.or.kr/menu.es?mid=a10601030000",
+            "body_available": true
+          },
+          {
+            "title": "공공부문 온실가스 감축 우수기관 환경부장관상 수상",
+            "date": "2021-12",
+            "source": "기관 연혁(누리집)",
+            "url": "https://www.ksponco.or.kr/menu.es?mid=a10601030000",
+            "body_available": true
+          }
+        ],
+        "sources": [
+          {
+            "id": "history",
+            "name": "기관 연혁(누리집)",
+            "period": "1990-07~2026-07",
+            "url": "https://www.ksponco.or.kr/menu.es?mid=a10601030000"
+          }
+        ],
+        "badges": [
+          "2026년 7월 자료"
+        ],
+        "corrections": [
+          "'한체산'을(를) '한국체육산업개발'(으)로 읽었어요"
+        ],
+        "unsupported_numbers": [],
+        "notice": "채산은 한국체육산업개발의 공식 서비스가 아닌 비공식 안내입니다.",
+        "meta": {
+          "intent": "history"
+        }
+      }
+    },
+    {
+      "lane": "시설·이용",
+      "question": "올림픽공원에서 반려견과 함께 입장할 수 있어요?",
+      "response": {
+        "status": "answered",
+        "answer": "올림픽공원은 반려견과 함께 산책 및 조깅이 가능해요. 다만 위생과 안전을 위해 반드시 목줄, 입 가리개, 배변봉투를 지참해야 해요.",
+        "evidence_kind": "documents",
+        "evidence_rows": [],
+        "documents": [
+          {
+            "title": "미사경정공원 입장료는 있나요",
+            "date": "2024-07-09",
+            "source": "자주 묻는 질문정보",
+            "url": null,
+            "body_available": true
+          },
+          {
+            "title": "올림픽공원 반려견 출입 질문",
+            "date": "2024-07-09",
+            "source": "자주 묻는 질문정보",
+            "url": null,
+            "body_available": true
+          },
+          {
+            "title": "미사경정공원 매점에서 식사로 먹을 수 있는 것이 있나요",
+            "date": "2024-07-09",
+            "source": "자주 묻는 질문정보",
+            "url": null,
+            "body_available": true
+          },
+          {
+            "title": "유치원에서 약 20명의 아이들을 데리고 소풍을 가려고 하는데 예약을 해야 하나요",
+            "date": "2024-07-09",
+            "source": "자주 묻는 질문정보",
+            "url": null,
+            "body_available": true
+          },
+          {
+            "title": "미사경정공원은 몇시부터 개방하나요",
+            "date": "2024-07-09",
+            "source": "자주 묻는 질문정보",
+            "url": null,
+            "body_available": true
+          },
+          {
+            "title": "장미광장에 애완동물을 데리고 가도 되나요",
+            "date": "2024-07-09",
+            "source": "자주 묻는 질문정보",
+            "url": null,
+            "body_available": true
+          }
+        ],
+        "sources": [
+          {
+            "id": "15089962",
+            "name": "자주 묻는 질문정보",
+            "period": "2016-05-03~2026-08-19",
+            "url": "https://www.data.go.kr/data/15089962/fileData.do"
+          }
+        ],
+        "badges": [
+          "2026년 8월 자료"
+        ],
+        "corrections": [],
+        "unsupported_numbers": [],
+        "notice": "채산은 한국체육산업개발의 공식 서비스가 아닌 비공식 안내입니다.",
+        "meta": {
+          "intent": "facility"
+        }
+      }
+    },
+    {
+      "lane": "데이터",
+      "question": "미사경정공원 2024년 월별 주차 대수를 알려줘",
+      "response": {
+        "status": "answered",
+        "answer": "2024년 미사경정공원 월별 주차 대수는 1월 20947, 2월 25708, 3월 41370, 4월 101432, 5월 63607, 6월 50844, 7월 39947, 8월 38024, 9월 47370, 10월 82534, 11월 53087, 12월 23635예요.",
+        "evidence_kind": "table",
+        "evidence_rows": [
+          {
+            "month": 1,
+            "cars": 20947
+          },
+          {
+            "month": 2,
+            "cars": 25708
+          },
+          {
+            "month": 3,
+            "cars": 41370
+          },
+          {
+            "month": 4,
+            "cars": 101432
+          },
+          {
+            "month": 5,
+            "cars": 63607
+          },
+          {
+            "month": 6,
+            "cars": 50844
+          },
+          {
+            "month": 7,
+            "cars": 39947
+          },
+          {
+            "month": 8,
+            "cars": 38024
+          },
+          {
+            "month": 9,
+            "cars": 47370
+          },
+          {
+            "month": 10,
+            "cars": 82534
+          },
+          {
+            "month": 11,
+            "cars": 53087
+          },
+          {
+            "month": 12,
+            "cars": 23635
+          }
+        ],
+        "documents": [],
+        "sources": [
+          {
+            "id": "15131671",
+            "name": "월별주차현황",
+            "period": "2023-01-01~2025-12-01",
+            "url": "https://www.data.go.kr/data/15131671/fileData.do"
+          }
+        ],
+        "badges": [
+          "2025년 12월 자료",
+          "같은 기간 다른 자료와 값이 다를 수 있어요(주의점 참고)"
+        ],
+        "corrections": [],
+        "unsupported_numbers": [],
+        "notice": "채산은 한국체육산업개발의 공식 서비스가 아닌 비공식 안내입니다.",
+        "meta": {
+          "intent": "data"
+        }
+      }
+    },
+    {
+      "lane": "소식",
+      "question": "올림픽공원 소식 중에 2026년 6월에는 어떤 글이 올라왔어?",
+      "response": {
+        "status": "answered",
+        "answer": "기록에 따르면 2026-06-12에 올림픽공원 주차장 이용 및 요금 안내 글이 올라왔어요.",
+        "evidence_kind": "documents",
+        "evidence_rows": [],
+        "documents": [
+          {
+            "title": "올림픽공원 주차장 이용 및 요금 안내",
+            "date": "2026-06-12",
+            "source": "올림픽공원 핫뉴스 정보",
+            "url": "https://www.ksponco.or.kr/olympicpark/board.es?mid=a20601000000&bid=0045&list_no=84077&act=view",
+            "body_available": false
+          }
+        ],
+        "sources": [
+          {
+            "id": "15090715",
+            "name": "올림픽공원 핫뉴스 정보",
+            "period": "2015-04-29~2026-06-19",
+            "url": "https://www.data.go.kr/data/15090715/fileData.do"
+          }
+        ],
+        "badges": [
+          "2026년 6월 자료",
+          "본문 없음, 원문 링크 확인"
+        ],
+        "corrections": [],
+        "unsupported_numbers": [],
+        "notice": "채산은 한국체육산업개발의 공식 서비스가 아닌 비공식 안내입니다.",
+        "meta": {
+          "intent": "news"
+        }
+      }
+    },
+    {
+      "lane": "시설·이용",
+      "question": "올림픽공원 야구장 이용 가능한가요?",
+      "response": {
+        "status": "unknown",
+        "answer": "한체산 개방 데이터에서 이 질문에 답할 근거를 찾지 못했어요. 추측해서 말씀드리지 않을게요.",
+        "evidence_kind": "none",
+        "evidence_rows": [],
+        "documents": [],
+        "sources": [],
+        "badges": [],
+        "corrections": [],
+        "unsupported_numbers": [],
+        "notice": "채산은 한국체육산업개발의 공식 서비스가 아닌 비공식 안내입니다.",
+        "meta": {
+          "intent": "facility"
+        }
+      }
+    }
+  ]
+}
