@@ -23,6 +23,7 @@ GENERIC: Final = frozenset(
     {"올림픽공원", "한국체육산업개발", "한체산", "정보", "현황", "목록", "데이터", "자료", "정보목록", "강좌정보"}
 )
 _WORD: Final = re.compile(r"[0-9A-Za-z가-힣]+")
+SIBLING_GROUP_MAX: Final = 3  # 이 수 이하로 작은 묶음만 형제 카드를 함께 후보로 넣는다(큰 묶음은 후보가 넘친다)
 
 PLAN_SCHEMA: Final[dict[str, Any]] = {
     "type": "object",
@@ -55,7 +56,7 @@ class Ranking:
     fallback: bool  # 어느 데이터도 직접 가리키지 않아 묶음 대표로 채웠는가
 
 
-def _name_terms(card: Card) -> list[str]:
+def name_terms(card: Card) -> list[str]:
     """카드 이름의 낱말(일반 낱말 제외)과 별칭을 squash 형태로. 2글자 이상만."""
     words = [w for w in _WORD.findall(card.name) if w not in GENERIC]
     out: list[str] = []
@@ -75,7 +76,7 @@ def rank_cards(question: str, catalog: Catalog, *, limit: int = MAX_CANDIDATES) 
     scored: list[Candidate] = []
     loaded_terms: set[str] = set()
     for card in catalog.loaded():
-        terms = _name_terms(card)
+        terms = name_terms(card)
         loaded_terms.update(terms)
         direct_hits = sum(1 for t in terms if t in q)
         pool = squash_text(" ".join([card.name, card.summary or "", *card.example_questions]))
@@ -86,12 +87,25 @@ def rank_cards(question: str, catalog: Catalog, *, limit: int = MAX_CANDIDATES) 
         scored.append(Candidate(card, weight * (3.0 * direct_hits + 0.3 * overlap), direct_hits > 0))
     scored.sort(key=lambda c: (-c.score, c.card.id))
     any_direct = any(c.direct for c in scored)
+    # 같은 주제 묶음의 형제 카드도 후보에 넣는다(묶음이 작을 때만).
+    # 예: '주차장'이 혼잡도·월별주차를 직접 가리켜도, 시간대별 집계 표를
+    # 가진 입출차 카드가 같은 묶음이라 함께 보여야 "몇 시에 붐벼?"를 계획할 수 있다.
+    have = {c.card.id for c in scored}
+    for hit in [c for c in scored if c.direct][:2]:
+        members = [catalog.cards[m] for m in catalog.groups[hit.card.group].members] if hit.card.group in catalog.groups else []
+        loaded = [m for m in members if m.loaded]
+        if len(loaded) <= SIBLING_GROUP_MAX:
+            for sib in loaded:
+                if sib.id not in have:
+                    have.add(sib.id)
+                    scored.append(Candidate(sib, hit.score * 0.5, False))
+    scored.sort(key=lambda c: (-c.score, c.card.id))
     planned: list[Card] = []
     if not any_direct:  # 적재된 데이터를 직접 가리키지 않을 때만 '연결 예정' 오픈API를 본다
         for card in catalog.cards.values():
             if card.loaded:
                 continue
-            distinct = [t for t in _name_terms(card) if t not in loaded_terms]
+            distinct = [t for t in name_terms(card) if t not in loaded_terms]
             if any(t in q for t in distinct):
                 planned.append(card)
     top = scored[:limit]
@@ -102,7 +116,7 @@ def rank_cards(question: str, catalog: Catalog, *, limit: int = MAX_CANDIDATES) 
     return Ranking(top, planned, fallback)
 
 
-def _columns_text(card: Card) -> str:
+def columns_text(card: Card) -> str:
     return ", ".join(f"{c['name']}({c['ko']}, {c['sql_type']})" for c in card.columns if not str(c["name"]).endswith("_raw"))
 
 
@@ -111,13 +125,25 @@ def describe_candidate(card: Card, number: int) -> str:
     period = f"{card.period_start}~{card.period_end}" if card.period_start else "기간 정보 없음"
     lines = [f"{number}) id={card.id} | {card.name} | 갈래={card.group} | 실제 기간 {period} | {card.summary or ''}"]
     for t in card.tables:
-        schema = AGGREGATE_SCHEMAS.get(t) or _columns_text(card)
+        schema = AGGREGATE_SCHEMAS.get(t) or columns_text(card)
         lines.append(f"   표 {t}: {schema}")
     if card.id in DOC_SOURCES:
         lines.append("   문서 검색 가능(search_terms 사용)" + ("" if card.body_available else " — 제목 수준, 본문 없음"))
     for caveat in card.caveats[:2]:
         lines.append(f"   주의: {caveat[:140]}")
     return "\n".join(lines)
+
+
+def schema_lines(cards: Sequence[Card]) -> list[str]:
+    """설명 프롬프트에 넣는 '자료 설명': 근거로 쓴 표의 열 뜻.
+    이것이 없으면 설명 LLM이 hour=8, total_entries=20762 같은 행을 보고도
+    무슨 수량인지 몰라 '알 수 없어요'라고 답한다(실제 모델에서 관찰)."""
+    lines: list[str] = []
+    for card in cards:
+        period = f"{card.period_start}~{card.period_end}" if card.period_start else "기간 정보 없음"
+        for t in card.tables:
+            lines.append(f"{card.name}({period}) 표 {t}: {AGGREGATE_SCHEMAS.get(t) or columns_text(card)}")
+    return lines
 
 
 def when_text(when: When | None) -> str:
@@ -142,7 +168,11 @@ def build_plan_prompt(
         "② 숫자·날짜는 직접 계산하지 말고 SQL로 구한다: SELECT만, 후보 표만, LIMIT 50 이하, "
         "날짜는 'YYYY-MM-DD' 문자열로 비교한다. "
         "③ 문서(FAQ·보도·연혁·소식)는 sql을 비우고 search_terms(질문에 나온 핵심 낱말 1~4개, 2글자 이상)를 쓴다. "
-        "④ 기간은 위 '코드가 해석한 기간'을 그대로 쓰고 직접 해석하지 않는다. ⑤ card_ids에는 실제로 쓰는 후보의 id를 모두 적는다."
+        "④ 기간은 위 '코드가 해석한 기간'을 그대로 쓰고 직접 해석하지 않는다. "
+        "⑤ card_ids에는 실제로 쓰는 후보의 id를 모두 적는다. "
+        "⑥ sql은 SELECT 한 문장만 쓴다(세미콜론으로 문장을 잇지 않는다). 여러 표가 필요해도 가장 알맞은 표 하나만 고른다. "
+        "⑦ 질문이 묻는 대상(혼잡도, 이용 인원, 가격 등)을 직접 담은 열이 후보에 없으면, "
+        "정원·금액처럼 뜻이 다른 열로 대신 답하지 말고 answerable=false로 한다."
     )
     if feedback:
         instruction += f"\n이전 계획이 거부되었다(사유: {feedback}). 후보와 규칙에 맞게 다시 만든다."

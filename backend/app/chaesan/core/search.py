@@ -30,7 +30,7 @@ CANDIDATES_PER_TERM: Final = 200  # 검색어 하나가 가져올 후보 상한(
 TITLE_BONUS: Final = 0.2
 RANK_WEIGHT: Final = 0.1
 
-type Order = Literal["score", "date_desc"]
+type Order = Literal["score", "date_desc", "date_asc"]
 type Mode = Literal["fts", "like"]
 
 _COLUMNS: Final = (
@@ -64,6 +64,11 @@ class SearchResult:
     hits: list[Hit] = field(default_factory=list)
     rows_read: int = 0  # 이 검색이 읽은 행 수(하루 한도 점검용 로그)
     terms: tuple[str, ...] = ()  # 실제로 쓴 검색어(정리 후)
+    # 상위 limit건만이 아니라 조건에 맞는 문서 전체에 대한 요약(코드가 센 값). "언제부터", "몇 건" 같은 질문은 이 값으로 답한다.
+    total: int = 0
+    first_date: str | None = None
+    last_date: str | None = None
+    capped: bool = False  # 검색어 하나가 후보 상한(CANDIDATES_PER_TERM)에 걸려 total·날짜가 일부일 수 있다
 
 
 def clean_terms(terms: Sequence[str]) -> list[str]:
@@ -155,6 +160,8 @@ async def search_docs(
     async def run(sql: str, params: tuple[Any, ...], term: str) -> None:
         res = await db.query(sql, params)
         result.rows_read += res.rows_read
+        if len(res.rows) >= CANDIDATES_PER_TERM:
+            result.capped = True
         for row in res.rows:
             slot = found.setdefault(row["doc_id"], {"row": row, "terms": set(), "rank": 0.0})
             slot["terms"].add(term)
@@ -193,7 +200,13 @@ async def search_docs(
                 suspicious=bool(row["suspicious"]), score=round(base * weight, 6), matched_terms=matched,
             )
         )  # fmt: skip
-    if order == "date_desc":
+    dates = [h.doc_date for h in scored if h.doc_date]
+    result.total = len(scored)
+    result.first_date = min(dates) if dates else None
+    result.last_date = max(dates) if dates else None
+    if order == "date_asc":
+        scored.sort(key=lambda h: (h.doc_date is None, h.doc_date or "", -h.score, h.doc_id))
+    elif order == "date_desc":
         scored.sort(key=lambda h: (h.doc_date or "", h.score), reverse=True)
     else:
         scored.sort(key=lambda h: (-h.score, -(len(h.matched_terms)), h.doc_id))

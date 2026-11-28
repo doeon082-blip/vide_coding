@@ -285,3 +285,19 @@ def test_unusable_terms_do_not_touch_the_database() -> None:
         assert r.hits == [] and r.rows_read == 0
     assert run(S.search_docs(fake, ["수영장"], weights=WEIGHTS, limit=0)).hits == []
     assert fake.calls == 0  # 근거 없는 질문에 D1 읽기 한도를 쓰지 않는다
+
+
+@needs_data
+def test_summary_and_date_orders(db: SqliteDB) -> None:
+    """상위 몇 건이 아니라 전체 일치 문서에 대한 요약(총 건수·가장 이른/늦은 날짜)을 코드가 센다."""
+    r = find(db, ["장미"], source_ids=["15137825"], limit=3, order="date_asc")
+    assert r.total > 3
+    assert r.first_date == r.hits[0].doc_date == "2014-06-01"
+    assert r.last_date and r.last_date >= r.first_date
+    assert [h.doc_date for h in r.hits] == sorted(h.doc_date or "" for h in r.hits)
+    desc = find(db, ["장미"], source_ids=["15137825"], limit=3, order="date_desc")
+    assert desc.hits[0].doc_date == desc.last_date
+    assert (desc.total, desc.first_date, desc.last_date) == (r.total, r.first_date, r.last_date)  # 정렬과 상관없는 같은 요약
+    assert not r.capped
+    none = find(db, ["존재하지않는낱말xyz"])
+    assert (none.total, none.first_date, none.last_date) == (0, None, None)
