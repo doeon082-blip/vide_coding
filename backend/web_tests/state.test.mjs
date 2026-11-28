@@ -1,7 +1,7 @@
 // 상태 변경 시험: 새 객체를 돌려주고, 늦게 온 타이머가 답 화면을 건드리지 못하는지.
 import assert from "node:assert/strict";
 import test from "node:test";
-import { addAnswer, addQuestion, clearChat, createStore, initialState, setStep, setView, toggleRows } from "../app/chaesan/web/js/state.js";
+import { addAnswer, addQuestion, clearChat, createStore, initialState, setStep, setView, toggleAnswer, toggleRows } from "../app/chaesan/web/js/state.js";
 import { toViewModel } from "../app/chaesan/web/js/view-model.js";
 
 const vm = (extra = {}) => toViewModel({ status: "answered", answer: "a", ...extra });
@@ -61,4 +61,10 @@ test("저장소: 바꾸면 구독자에게 알리고, 해제하면 알리지 않
   store.update((s) => addAnswer(s, vm()));
   assert.deepEqual(seen, ["loading"]);
   assert.equal(store.get().phase, "idle");
+});
+
+test("긴 답 펼침은 해당 답에만 적용된다", () => {
+  let s = addAnswer(addAnswer(initialState(), vm()), vm());
+  s = toggleAnswer(s, s.messages[0].id);
+  assert.deepEqual(s.messages.map((m) => m.answerOpen), [true, false]);
 });
