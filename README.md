@@ -35,11 +35,11 @@
 | B | 파일 30종 SQLite 적재, 입출차 시간대 집계 표 | 완료 |
 | C | 데이터 카드(실제 기간·주의점·등급)와 주제 묶음 | 완료(검토 대기) |
 | D | 문서 색인(FTS5)과 오타·줄임말 보정 | 완료(검토 대기) |
-| E | 답변 엔진(계획 → 검사·실행 → 설명 → 숫자 대조) | 계획 |
+| E | 답변 엔진(계획 → 검사·실행 → 설명 → 숫자 대조) | 완료(검토 대기) |
 | F | 개발용 질문 20개로 검사 | 계획 |
 | G | 화면과 배포(Cloudflare Workers/D1) | 계획 |
 
-**아직 되지 않는 것(숨기지 않습니다):** 질문에 답하는 기능은 아직 없습니다(E단계). 오픈API 28종은 연결 전이고, 기상청·서울 도시데이터·특일 정보도 2단계 계획입니다. 한글로 쓴 수("삼십 명")는 숫자 대조가 읽지 못해, 프롬프트로 아라비아 숫자만 쓰게 하고 답변 단계에서 따로 거릅니다.
+**아직 되지 않는 것(숨기지 않습니다):** 화면(G단계)과 서비스 배포는 아직 없고, 개발용 질문 20개로 정확도를 재는 검사(F단계)를 하지 않았습니다. `POST /api/chaesan/ask`는 로컬에서만 동작합니다. 오픈API 28종은 연결 전이고, 기상청·서울 도시데이터·특일 정보도 2단계 계획입니다. 한글로 쓴 수("삼십 명")는 숫자 대조가 읽지 못해, 프롬프트로 아라비아 숫자만 쓰게 하고 답변 단계에서 따로 거릅니다.
 
 ## 구조
 
@@ -50,9 +50,12 @@ backend/app/chaesan/
 │   ├── catalog.py               # 데이터 카드 읽기·검증
 │   ├── search.py                # 문서 키워드 검색(FTS5 + LIKE + 등급 가중치)
 │   ├── correct.py               # 오타·줄임말 보정(약칭 → 자모 거리 → 확신도)
+│   ├── planner.py engine.py     # 후보 데이터 선정·계획 검증, 답변 엔진(질문당 LLM 최대 3번)
+│   └── demand.py                # 개방 수요 기록(질문 원문 저장 안 함)
 │   ├── guard.py                 # 프롬프트 인젝션 방어, LLM 출력 검사
 │   ├── when.py                  # "지난달·7월·주말" 같은 기간 해석(과거 기준)
-│   └── sql_guard.py  answer.py  typo.py   # SQL 검사, 답 속 숫자 대조, 자모 풀기·편집 거리
+│   └── sql_guard.py  answer.py  typo.py   # SQL 검사, 답 속 숫자 대조·배지, 자모 풀기·편집 거리
+├── local/       # 로컬 전용: sqlite 어댑터, Ollama, 시계, 수요 기록 파일, FastAPI(app.py)
 └── ingest/      # 로컬 전용: 원본 CSV → SQLite
     ├── specs.py convert.py load.py aggregate.py   # 적재
     ├── card_meta.py cards.py                      # 데이터 카드(58개: 적재 31 + 미연결 API 27)
@@ -72,6 +75,7 @@ uv run python -m app.chaesan.ingest.docs     # 문서 색인(docs, docs_fts)
 uv run python -m app.chaesan.ingest.aliases  # 오타 보정용 사전 app/chaesan/aliases.json
 uv run python -m app.chaesan.ingest.cards    # data/cards/*.json 생성(DB에서 기간·행 수를 직접 계산)
 uv run pytest                                # 전체 테스트(린트·타입 검사 포함)
+uv run uvicorn app.chaesan.local.app:app --port 8100 --no-proxy-headers   # 채산 API(Ollama와 gemma4:26b 필요)
 uv run ruff check && uv run mypy             # 코드 양식·타입 검사(채산 코드만)
 ```
 
