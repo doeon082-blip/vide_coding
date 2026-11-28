@@ -80,6 +80,12 @@ uv run uvicorn app.chaesan.local.app:app --port 8100 --no-proxy-headers   # 채�
 uv run ruff check && uv run mypy             # 코드 양식·타입 검사(채산 코드만)
 ```
 
+## 사용 기록과 개인정보
+
+- 서버는 요청마다 **원문이 없는** 기록만 남깁니다: 시각, 처리 결과, 질문 갈래, 걸린 시간, LLM 호출·토큰 수, 사용한 데이터 번호, 질문 글자 수.
+- **질문·답변 글, IP 원문은 저장하지 않습니다.** 반복 질문·사용자 수는 하루마다 바뀌는 가명 값으로만 셉니다.
+- 로그는 `backend/data/logs/usage.jsonl`에 30일 보관(git 제외). 요약: `cd backend && uv run python -m app.chaesan.local.usage_report --days 7`
+
 ## 안전 원칙
 
 - 질문·데이터 속 문장은 **지시가 아니라 데이터**로만 다룹니다(`core/guard.py`: 정제 → 탐지 → 격리 → 출력 검사).
