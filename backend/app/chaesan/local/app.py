@@ -36,6 +36,7 @@ from app.chaesan.ingest.load import BACKEND_DIR, DB_PATH
 from app.chaesan.local.clock import SystemClock
 from app.chaesan.local.db import SqliteDB
 from app.chaesan.local.demand import JsonlDemandSink
+from app.chaesan.local.limits import DailyBudget
 from app.chaesan.local.llm import make_llm
 from app.chaesan.local.ratelimit import RateLimitMiddleware, client_ip
 from app.chaesan.local.usage_log import FileUsageLog, Pseudonymizer, UsageSink, build_event
@@ -55,6 +56,7 @@ ASK_LIMIT_PER_MINUTE = 10  # 질문 한 번에 LLM을 최대 3번 부르므로 �
 MAX_RUNNING = 2  # 동시에 처리하는 질문 수(로컬 LLM 한 대가 감당할 수준)
 MAX_WAITING = 4  # 처리 순서를 기다리는 질문 수. 넘치면 기다리게 하지 않고 바로 503
 MSG_BUSY = "지금은 질문이 많아요. 잠시 후 다시 물어봐 주세요."
+MSG_DAILY_LIMIT = "오늘 받을 수 있는 질문을 모두 썼어요. 내일 다시 물어봐 주세요. 예시 질문은 계속 볼 수 있어요."
 
 
 class Gate:
@@ -110,15 +112,22 @@ def build_engine(
 
 
 def create_app(
-    engine: Engine | None = None, *, rate_limit: bool | None = None, gate: Gate | None = None, usage: UsageSink | None = None
+    engine: Engine | None = None,
+    *,
+    rate_limit: bool | None = None,
+    gate: Gate | None = None,
+    usage: UsageSink | None = None,
+    budget: DailyBudget | None = None,
 ) -> FastAPI:
     """usage: 사용 기록을 받는 곳(None이면 기록하지 않는다. 시험이 파일을 만들지 않게 기본값은 없음)."""
     limiter = gate or Gate()
+    daily = budget or DailyBudget.from_env()  # 하루 질문 한도(AI 무료 한도를 한 사람이 다 쓰지 못하게)
     docs_on = os.getenv("ENABLE_DOCS", "off").lower() == "on"
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.engine = engine or build_engine()
+        logger.info("chaesan started: llm=%s", getattr(app.state.engine, "llm_label", "unknown"))  # 어느 모델인지만(키·주소 없음)
         yield
 
     app = FastAPI(
@@ -140,6 +149,14 @@ def create_app(
         is_api = request.url.path.startswith("/api/")
         response.headers["Content-Security-Policy"] = API_CSP if is_api else PAGE_CSP
         response.headers["Cache-Control"] = "no-store"
+        # 브라우저 기능을 모두 끄고(카메라·마이크·위치 등), 다른 출처가 이 페이지와 창·자원을 공유하지 못하게 한다.
+        response.headers["Permissions-Policy"] = (
+            "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()"
+        )
+        response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+        response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
+        if request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https":
+            response.headers["Strict-Transport-Security"] = "max-age=31536000"  # HTTPS로만 접속하게(HTTPS일 때만 의미가 있다)
         return response
 
     app.add_middleware(ChaesanRateLimit, enabled=enabled)
@@ -178,14 +195,21 @@ def create_app(
 
     @app.post(ASK_PATH)
     async def ask(body: AskIn, request: Request) -> JSONResponse:
+        ip = client_ip(request)
+        if daily.check(ip) is not None:  # AI를 부르기 전에 막는다(예산을 쓰지 않는다)
+            request.state.usage = {"q_len": len(body.question), "result": "daily_limit"}
+            raise HTTPException(status_code=429, detail=MSG_DAILY_LIMIT)
         async with limiter.enter():
             card = await request.app.state.engine.ask(body.question)
+        if card.meta.get("llm_calls"):
+            daily.charge(ip)
         # 처리 결과 요약만 남긴다(질문·답변 글자는 싣지 않는다). 사용 기록 미들웨어가 요청 기록에 합쳐 쓴다.
         now = datetime.now(KST)
         request.state.usage = {
             "q_len": len(body.question),
             "q_hash": pseudonym(body.question, now),
             "result": card.status,
+            "llm": getattr(request.app.state.engine, "llm_label", "unknown"),  # 이름을 모르는 엔진도 기록은 계속
             "intent": card.meta.get("intent"),
             "llm_calls": card.meta.get("llm_calls"),
             "input_tokens": card.meta.get("input_tokens"),
