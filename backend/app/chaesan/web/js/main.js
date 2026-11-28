@@ -3,7 +3,7 @@
 
 import { askServer } from "./api.js";
 import { renderSuggestions, renderThread } from "./render.js";
-import { addAnswer, addQuestion, clearChat, createStore, initialState, setStep, setView, toggleRows } from "./state.js";
+import { addAnswer, addQuestion, clearChat, createStore, initialState, setStep, setView, toggleAnswer, toggleRows } from "./state.js";
 import { MAX_QUESTION, failureViewModel, toViewModel } from "./view-model.js";
 import { dayOf } from "./lib/format.js";
 
@@ -29,6 +29,7 @@ let shown = 0; // 마지막으로 그린 메시지 수(새 메시지가 생겼�
 
 const handlers = {
   onToggleRows: (id) => store.update((s) => toggleRows(s, id)),
+  onToggleAnswer: (id) => store.update((s) => toggleAnswer(s, id)),
   onView: (id, view) => store.update((s) => setView(s, id, view)),
   onPick: (example) => pickExample(example),
   async onCopy(answer, label) {
