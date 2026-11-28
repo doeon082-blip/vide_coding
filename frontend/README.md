@@ -5,18 +5,27 @@
 
 ## 구조
 ```
-index.html            뼈대(채팅형 화면). 인라인 코드 없음, CSP 메타 포함
-css/                  base(색·글자·갈래 색) / layout(배치·입력창) / card(말풍선·그래프·표)
-js/main.js            시작점: 이벤트 연결, 질문 흐름
-js/state.js           상태 하나와 상태를 바꾸는 순수 함수(대화는 메모리에만, 저장하지 않음)
-js/api.js             서버 호출(POST api/chaesan/ask), 30초 제한, 오류 분류
-js/render.js          render(state): 대화 영역을 통째로 다시 그림
-js/components.js      말풍선·답변 카드·막대 그래프·표·목록(값을 받아 요소를 돌려주는 함수)
-js/view-model.js      서버 응답 → 화면 값(DOM 없음). 숫자 미확인이면 한 줄 답을 숨김
-js/lib/               dom(textContent만 쓰는 요소 생성) / safe-url(https+허용 도메인) / format / lane / mode
-img/                  직접 그린 공원 일러스트(밝은·어두운 판), 갈래 아이콘, 로고
-data/examples.json    실제 엔진이 낸 미리 계산한 답 10개(backend/eval/build_examples.py가 생성)
-tests/                node --test 시험(링크 검사·값 정리·서버 호출·상태·예비 모드)
+index.html              뼈대(채팅형 화면). 인라인 코드 없음, CSP 메타 포함
+css/                    base(색·글자·갈래 색) / layout(배치·입력창) / card(말풍선·답변 카드)
+                        evidence(그래프·표·목록) / chat(입력 중 표시·이어 묻기)
+js/main.js              시작점: 상태를 만들고 아래 조각들을 연결
+js/state.js             상태 하나와 상태를 바꾸는 순수 함수(대화는 메모리에만, 저장하지 않음)
+js/api.js               서버 호출(POST api/chaesan/ask), 30초 제한, 오류 분류
+js/composer.js          아래에 붙은 입력창: Enter 전송, 한글 조합 중 Enter 무시, 글자 수
+js/render.js            render(state): 대화 영역을 통째로 다시 그림
+js/scroll.js            새 메시지가 생겼을 때의 스크롤(긴 답은 처음부터)
+js/examples.js          예시 질문과 미리 계산한 답(data/examples.json) 읽기
+js/clipboard.js         답 복사
+js/components.js        components/ 입구(render.js가 여기서만 가져다 씀)
+js/components/          조각마다 한 파일: answer-card, answer-block, badges, bar-chart, evidence, evidence-table,
+                        documents, sources, suggestions, user-bubble, typing-bubble, avatar, copy-button, link
+js/view-model.js        view-model/ 입구
+js/view-model/          서버 응답 → 화면 값(DOM 없음): answer(숫자 미확인이면 답을 숨김), table(표·그래프 값),
+                        documents, sources, failure, follow-ups, constants, guards
+js/lib/                 dom(textContent만 쓰는 요소 생성) / safe-url(https+허용 도메인) / format / lane / mode
+img/                    직접 그린 공원 일러스트(밝은·어두운 판), 갈래 아이콘, 로고
+data/examples.json      실제 엔진이 낸 미리 계산한 답 10개(backend/eval/build_examples.py가 생성)
+tests/                  node --test 시험(링크 검사·값 정리·서버 호출·상태·예비 모드)
 ```
 
 ## 실행
