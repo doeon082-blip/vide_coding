@@ -137,6 +137,9 @@ class WorkersAILLM:
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
             "temperature": temperature,
             "max_tokens": max_tokens,
+            # gemma-4는 추론(생각) 모델이라 켜 두면 생각에 토큰을 다 써서 본문이 비어 돌아온다(실측: 출력 100토큰 전부 생각,
+            # content 빈 문자열). Workers AI 문서의 방법으로 끈다(로컬 Ollama의 reasoning_effort="none"과 같은 목적).
+            "chat_template_kwargs": {"enable_thinking": False},
             # Workers AI JSON 모드: json_schema에 스키마 자체를 넣는다(공식 문서 형식).
             "response_format": {"type": "json_schema", "json_schema": schema},
         }
