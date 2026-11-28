@@ -9,7 +9,7 @@
 - 20개 중 5개는 오타·줄임말 변형이고, 3개는 데이터에 근거가 없어 '모른다'가 정답이다.
 - 이 파일은 개발용이다. 시험용 60문항(test_questions.jsonl)과는 다르며 여기서 점수를 보고 코드를 질문에 맞춰 고치지 않는다(규칙 11·12).
 
-필드: id, question, type, expected_tables(카드 번호), expected_answer(사람이 읽는 정답), expect_status(허용 상태),
+필드: id, question, type, expected_tables(카드 번호), expected_answer(사람이 읽는 정답), expect_status(허용 상태), allowed_fixes(기대하지 않아도 틀린 보정이 아닌 약칭 풀이),
   expect_contains(각 항목은 대안 목록: 답·근거 어디에든 하나는 있어야 함), expect_docs(문서 제목에 있어야 하는 낱말),
   typos([입력한 말, 고쳐야 할 말] 목록)
 """
@@ -53,6 +53,7 @@ def build(con: sqlite3.Connection) -> list[dict[str, Any]]:
                 "id": f"dev{len(items) + 1:02d}", "question": question, "type": type_, "expected_tables": tables,
                 "expected_answer": answer, "expect_status": kw.pop("status", ["answered"]),
                 "expect_contains": kw.pop("contains", []), "expect_docs": kw.pop("docs", []), "typos": kw.pop("typos", []),
+                "allowed_fixes": kw.pop("allowed_fixes", []),
             }
         )  # fmt: skip
 
@@ -131,7 +132,8 @@ def build(con: sqlite3.Connection) -> list[dict[str, Any]]:
 
     # 14 개방목록 건수
     n = q("SELECT COUNT(*) FROM t_15147873")[0][0]
-    add("org", "한체산이 공공데이터포털에 개방한 파일 목록은 모두 몇 건이야?", ["15147873"], f"{n}건 (포털 58종보다 적음)", contains=[num(n)])
+    add("org", "한체산이 공공데이터포털에 개방한 파일 목록은 모두 몇 건이야?", ["15147873"], f"{n}건 (포털 58종보다 적음)", contains=[num(n)],
+        allowed_fixes=[["한체산", "한국체육산업개발"]])  # 질문 속 공식 약칭을 풀어 읽는 것은 설계된 동작이라 '잘못 고침'이 아니다
 
     # 15 사전정보공표(항목을 난수로)
     title = rng.choice(q("SELECT title FROM t_15090257 ORDER BY _row"))[0].strip()

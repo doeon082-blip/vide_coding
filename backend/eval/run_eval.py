@@ -62,10 +62,11 @@ def grade(q: dict[str, Any], card: dict[str, Any]) -> dict[str, Any]:
         r["selection"] = status in q["expect_status"]
         r["facts"] = r["docs"] = None
         r["unknown_ok"] = status in ("unknown", "planned")
-    fixes = [c for c in card["corrections"]]
+    fixes = list(card["corrections"])
     want = [f"'{a}'을(를) '{b}'(으)로 읽었어요" for a, b in q["typos"]]
+    allowed = [f"'{a}'을(를) '{b}'(으)로 읽었어요" for a, b in q.get("allowed_fixes", [])]
     r["typo_ok"] = all(w in fixes for w in want) if q["typos"] else None
-    r["wrong_fixes"] = [c for c in fixes if c not in want]
+    r["wrong_fixes"] = [c for c in fixes if c not in want and c not in allowed]
     r["passed"] = all(v is not False for v in (r["selection"], r["facts"], r["docs"], r["unknown_ok"], r["typo_ok"]))
     r["cause"] = None if r["passed"] else classify(q, card, r)
     return r
