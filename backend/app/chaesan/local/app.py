@@ -24,6 +24,8 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, ValidationError
+from starlette.requests import ClientDisconnect
+from starlette.types import Scope
 
 from app.chaesan.core import guard
 from app.chaesan.core.catalog import load_catalog
@@ -82,6 +84,19 @@ class Gate:
             self._slots.release()
 
 
+# 웹으로 내보내는 화면 파일(허용 목록). frontend/의 나머지(tests/·package.json·README.md·점 파일)는 내보내지 않는다.
+PUBLIC_ENTRIES: Final = frozenset({"index.html", "privacy.html", "favicon.svg", "css", "js", "img", "data"})
+
+
+class PublicFiles(StaticFiles):
+    """StaticFiles에 '허용 목록'을 더한다: 시험·설정·문서 파일은 저장소에 있어도 서버가 내려주지 않는다."""
+
+    async def get_response(self, path: str, scope: Scope) -> Response:
+        if path not in {".", ""} and path.split("/", 1)[0] not in PUBLIC_ENTRIES:
+            raise HTTPException(status_code=404)
+        return await super().get_response(path, scope)
+
+
 class AskIn(BaseModel):
     question: str = Field(min_length=1, max_length=MAX_QUESTION_LEN)
 
@@ -96,11 +111,14 @@ async def read_question(request: Request) -> AskIn:
         raise HTTPException(status_code=415, detail="JSON 형식으로 보내 주세요.")
     chunks: list[bytes] = []
     total = 0
-    async for chunk in request.stream():
-        total += len(chunk)
-        if total > MAX_BODY_BYTES:
-            raise HTTPException(status_code=413, detail="요청 본문이 너무 큽니다.")
-        chunks.append(chunk)
+    try:
+        async for chunk in request.stream():
+            total += len(chunk)
+            if total > MAX_BODY_BYTES:
+                raise HTTPException(status_code=413, detail="요청 본문이 너무 큽니다.")
+            chunks.append(chunk)
+    except ClientDisconnect as exc:  # 보내는 도중 연결이 끊김: 서버 오류(500)가 아니라 잘못된 요청으로 끝낸다
+        raise HTTPException(status_code=400, detail="요청을 끝까지 받지 못했어요.") from exc
     try:
         return AskIn.model_validate_json(b"".join(chunks))
     except ValidationError as exc:  # 검증 상세(내부 필드 이름 등)는 돌려주지 않고 일반 문장만
@@ -198,17 +216,20 @@ def create_app(
                 path = request.url.path
                 if path.startswith("/api/") and path != "/api/health":
                     now = datetime.now(KST)
-                    sink.record(
-                        build_event(
-                            now=now,
-                            method=request.method,
-                            path=path,
-                            status_code=status_code,
-                            elapsed_ms=round((time.perf_counter() - started) * 1000),
-                            ip_pseudonym=pseudonym(client_ip(request), now),
-                            extra=getattr(request.state, "usage", None),
+                    try:
+                        sink.record(
+                            build_event(
+                                now=now,
+                                method=request.method,
+                                path=path,
+                                status_code=status_code,
+                                elapsed_ms=round((time.perf_counter() - started) * 1000),
+                                ip_pseudonym=pseudonym(client_ip(request), now),
+                                extra=getattr(request.state, "usage", None),
+                            )
                         )
-                    )
+                    except Exception:  # 기록 실패(어떤 종류든)가 시민의 응답을 500으로 바꾸면 안 된다
+                        logger.warning("usage log failed", exc_info=False)
 
     @app.get("/api/health")
     async def health() -> dict[str, str]:
@@ -256,7 +277,7 @@ def create_app(
 
     # 화면 파일은 API 경로를 모두 등록한 뒤 맨 마지막에 '/'로 붙인다(먼저 붙이면 /api/...를 가려 버린다).
     # directory가 없으면 StaticFiles가 시작할 때 바로 오류를 낸다 → 화면 없이 조용히 뜨지 않는다.
-    app.mount("/", StaticFiles(directory=WEB_DIR, html=True), name="web")
+    app.mount("/", PublicFiles(directory=WEB_DIR, html=True), name="web")
     return app
 
 
