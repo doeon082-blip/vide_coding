@@ -34,7 +34,6 @@ from app.chaesan.local.db import ro_uri
 CARDS_DIR: Final = BACKEND_DIR / "data" / "cards"
 HISTORY_HTML: Final = BACKEND_DIR / "data" / "raw" / "web" / "history.html"
 HISTORY_URL: Final = "https://www.ksponco.or.kr/menu.es?mid=a10601030000"
-OPENDATA_LIST_ID: Final = "15147873"
 NAME_PREFIX: Final = "한국체육산업개발주식회사_"
 
 # 오픈API 항목을 주제 묶음에 넣는 규칙(이름만 보고 정한 것, 내용 미확인). 위에서부터 먼저 맞는 것.

@@ -186,3 +186,15 @@ def test_concurrency_gate_rejects_overflow_without_queueing_forever() -> None:
     assert codes.count(503) == 3
     assert codes.count(200) == 5
     assert SlowEngine.started == 5
+
+
+def test_build_engine_can_turn_demand_recording_off(tmp_path: Any) -> None:
+    """개발용 검사·스모크가 실제 시민 수요 통계(demand.jsonl)에 섞이지 않게 끌 수 있어야 한다."""
+    from app.chaesan.ingest.cards import CARDS_DIR
+    from app.chaesan.ingest.load import DB_PATH
+    from app.chaesan.local.app import build_engine
+
+    if not (DB_PATH.is_file() and CARDS_DIR.is_dir()):
+        pytest.skip("데이터 없음")
+    assert build_engine(record_demand=False)._sink is None
+    assert build_engine()._sink is not None

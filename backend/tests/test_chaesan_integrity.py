@@ -17,7 +17,7 @@ CORE = BACKEND / "app" / "chaesan" / "core"
 # 지시서 4절 구조 중 지금 단계까지 있어야 하는 파일. 다른 파일(catalog, planner, search, demand)은 C~E단계에서 더한다.
 EXPECTED_CORE = {
     "__init__.py", "config.py", "ports.py", "guard.py", "when.py", "sql_guard.py", "answer.py", "typo.py",
-    "catalog.py", "search.py", "correct.py",
+    "catalog.py", "search.py", "correct.py", "dates.py", "planner.py", "engine.py", "demand.py",
 }  # fmt: skip
 EXPECTED_INGEST = {
     "__init__.py", "specs.py", "convert.py", "load.py", "aggregate.py", "card_meta.py", "cards.py", "docs.py", "aliases.py",

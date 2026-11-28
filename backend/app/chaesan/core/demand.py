@@ -13,7 +13,6 @@ from datetime import datetime
 from typing import Any, Final, Literal
 
 type Reason = Literal["no_data", "no_evidence", "planned_api"]  # 데이터 없음 / 찾았지만 근거 없음 / 연결 예정 API
-REASONS: Final = ("no_data", "no_evidence", "planned_api")
 MAX_TERMS: Final = 6
 _HANGUL_RUN: Final = re.compile(r"[가-힣]{2,}")
 

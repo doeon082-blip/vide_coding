@@ -10,12 +10,13 @@ import math
 import re
 import unicodedata
 from collections.abc import Iterable, Sequence
-from datetime import date, timedelta
+from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import Any, Final
 
 from app.chaesan.core.catalog import Card
 from app.chaesan.core.config import STALE_DAYS
+from app.chaesan.core.dates import period_end
 
 # 숫자 덩어리: 쉼표 천 단위(215,528)와 소수점(3.5)을 한 덩어리로 읽는다. 축제 앱의 `\d+`는 215,528을 215와 528로 쪼개서
 # 틀린 숫자도 통과시킬 수 있었다. 앞의 '-'는 부호일 때만 붙인다: 바로 앞이 숫자면 하이픈이다(2024-07-01).
@@ -84,28 +85,11 @@ def find_unsupported_numbers(answer: str, result_rows: list[dict[str, Any]]) -> 
 
 # --------------------------------------------------------------------------- 배지(최신성·주의 표시)
 
-_PARTIAL: Final = re.compile(r"^(\d{4})(?:-(\d{2}))?(?:-(\d{2}))?$")
 FLAG_BADGES: Final[dict[str, str]] = {
     "check_operating": "운영 여부는 센터에 확인하세요",
     "mixed_sources": "같은 기간 다른 자료와 값이 다를 수 있어요(주의점 참고)",
 }
 NO_BODY_BADGE: Final = "본문 없음, 원문 링크 확인"
-
-
-def period_end(text: str) -> tuple[int, int | None, date] | None:
-    """'2024-07-31' / '2024-07' / '2024' → (연, 월 또는 None, 그 기간의 마지막 날). 형식이 다르면 None."""
-    m = _PARTIAL.match(text)
-    if not m:
-        return None
-    year, month, day = int(m.group(1)), int(m.group(2)) if m.group(2) else None, int(m.group(3)) if m.group(3) else None
-    try:
-        if month is None:
-            return year, None, date(year, 12, 31)
-        if day is None:
-            return year, month, date(year + (month == 12), month % 12 + 1, 1) - timedelta(days=1)
-        return year, month, date(year, month, day)
-    except ValueError:
-        return None
 
 
 def freshness_badges(card: Card, today: date) -> list[str]:

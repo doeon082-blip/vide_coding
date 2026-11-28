@@ -126,7 +126,7 @@ async def main_async(path: Path, limit: int | None, tag: str = "") -> None:
     from app.chaesan.local.app import build_engine  # Ollama·DB가 필요해서 여기서 불러온다
 
     questions = load_questions(path)[:limit]
-    engine = build_engine()
+    engine = build_engine(record_demand=False)  # 평가용 질문이 개방 수요 기록을 오염시키지 않게
     cards: list[dict[str, Any]] = []
     graded: list[dict[str, Any]] = []
     for q in questions:

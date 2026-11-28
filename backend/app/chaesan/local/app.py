@@ -80,7 +80,9 @@ class ChaesanRateLimit(RateLimitMiddleware):
         return "default", 60, 60
 
 
-def build_engine(cards_dir: Path = CARDS_DIR, db_path: Path = DB_PATH, aliases: Path = ALIASES_PATH) -> Engine:
+def build_engine(
+    cards_dir: Path = CARDS_DIR, db_path: Path = DB_PATH, aliases: Path = ALIASES_PATH, *, record_demand: bool = True
+) -> Engine:
     """파일에서 엔진을 만든다. 파일이 없거나 형식이 틀리면 시작할 때 바로 멈춘다(조용히 빈 데이터로 시작하지 않는다)."""
     return Engine(
         db=SqliteDB(db_path),
@@ -88,7 +90,7 @@ def build_engine(cards_dir: Path = CARDS_DIR, db_path: Path = DB_PATH, aliases: 
         clock=SystemClock(),
         catalog=load_catalog(cards_dir),
         vocab=load_vocab(aliases),
-        sink=JsonlDemandSink(),
+        sink=JsonlDemandSink() if record_demand else None,  # 개발용 검사·스모크는 실제 시민 수요 통계에 섞이지 않게 끈다
     )
 
 

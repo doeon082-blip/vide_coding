@@ -51,6 +51,3 @@ LOCAL_MODEL: Final = "gemma4:26b"
 
 # 데이터 등급별 검색 가중치(검색 점수 = 유사도 × 가중치). 기준은 CLAUDE.md 설계 결정.
 TIER_WEIGHTS: Final[dict[str, float]] = {"A": 1.0, "B": 0.5, "C": 0.1}
-
-# LLM이 SQL을 쓸 수 있는 표. B단계(적재)에서 집계 표와 작은 표만 채운다. 비어 있으면 SQL 질문은 모두 거부된다.
-ALLOWED_TABLES: Final[frozenset[str]] = frozenset()

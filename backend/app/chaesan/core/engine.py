@@ -28,7 +28,6 @@ from app.chaesan.core.answer import (
     fallback_answer,
     find_unsupported_numbers,
     has_hangul_number,
-    period_end,
 )
 from app.chaesan.core.catalog import Card, Catalog
 from app.chaesan.core.config import (
@@ -43,6 +42,7 @@ from app.chaesan.core.config import (
     SQL_ROW_LIMIT,
 )
 from app.chaesan.core.correct import Corrector, Vocab
+from app.chaesan.core.dates import period_end
 from app.chaesan.core.planner import (
     PLAN_SCHEMA,
     Candidate,
