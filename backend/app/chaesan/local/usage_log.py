@@ -17,9 +17,11 @@ import hashlib
 import hmac
 import json
 import logging
+import os
 import secrets
 import threading
 from datetime import datetime
+from io import TextIOWrapper
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 from typing import Any, Final, Protocol
@@ -51,6 +53,14 @@ class Pseudonymizer:
         return hmac.new(day_key, value.encode("utf-8"), hashlib.sha256).hexdigest()[:12]
 
 
+class _PrivateRotatingHandler(TimedRotatingFileHandler):
+    """로그 파일을 소유자만 읽고 쓰게(0600) 만든다. 자정에 새로 만드는 파일도 같다(기본 권한이면 다른 계정이 읽을 수 있다)."""
+
+    def _open(self) -> TextIOWrapper:
+        fd = os.open(self.baseFilename, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+        return os.fdopen(fd, self.mode, encoding=self.encoding, errors=self.errors)  # type: ignore[return-value]
+
+
 class FileUsageLog:
     """JSON Lines 파일 기록기. 파일은 처음 기록할 때 만든다(import만으로 파일이 생기지 않게)."""
 
@@ -62,8 +72,8 @@ class FileUsageLog:
         self._warned = False
 
     def _open(self) -> TimedRotatingFileHandler:
-        self._path.parent.mkdir(parents=True, exist_ok=True)
-        handler = TimedRotatingFileHandler(self._path, when="midnight", backupCount=self._days, encoding="utf-8", delay=True)
+        self._path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        handler = _PrivateRotatingHandler(self._path, when="midnight", backupCount=self._days, encoding="utf-8", delay=True)
         handler.setFormatter(logging.Formatter("%(message)s"))
         return handler
 
@@ -108,7 +118,7 @@ def build_event(
 # 기록에 실을 수 있는 처리 결과 칸(허용 목록). 질문·답변 글자를 담는 칸은 이 목록에 없다.
 ALLOWED_EXTRA: Final = frozenset(
     {
-        "q_len", "q_hash", "result", "intent", "llm_calls", "input_tokens", "output_tokens", "rows_read", "engine_ms",
+        "q_len", "q_hash", "result", "llm", "intent", "llm_calls", "input_tokens", "output_tokens", "rows_read", "engine_ms",
         "sources", "corrections", "unsupported_numbers", "documents", "evidence_rows",
     }
 )  # fmt: skip
