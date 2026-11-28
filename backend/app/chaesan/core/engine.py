@@ -241,7 +241,8 @@ class Engine:
             return AnswerCard("unknown", MSG_UNKNOWN, corrections=notes)
         if evidence is None or evidence.kind == "none":
             await self._record(now, "no_evidence", plan.intent, ranking, q, plan.card_ids)
-            return AnswerCard("unknown", MSG_UNKNOWN, corrections=notes)
+            latest = await self._latest_outside_window(plan, when, today, ctx)
+            return AnswerCard("unknown", latest or MSG_UNKNOWN, corrections=notes)
         try:
             return await self._finish(q, today, when, evidence, notes, ctx)
         except _NotAnswering:  # 근거가 질문과 맞지 않는다: 억지로 답하지 않고 모른다고 하며 수요로 남긴다
@@ -345,7 +346,19 @@ class Engine:
         ev.cards = list(used.values())
         return ev
 
-    # ------------------------------------------------------------------ 설명 + 대조 + 카드
+    async def _latest_outside_window(self, plan: Plan, when: When | None, today: date, ctx: _Ctx) -> str | None:
+        """해석한 기간 안에 문서가 없을 때, 같은 출처에서 가장 최근 기록이 언제인지(코드가 센 값)를 알려 준다.
+        '요즘 무슨 행사가?'에 그냥 '근거가 없어요'라고만 하면, 자료가 오래돼서 없는 것인지 처음부터 없는 것인지 알 수 없다."""
+        sources = [i for i in plan.card_ids if i in DOC_SOURCES]
+        if when is None or when.start is None or when.end is None or not sources:
+            return None
+        res = await list_docs_in_period(
+            self._db, weights=self._weights, source_ids=sources, start=date(1900, 1, 1), end=today, order="date_desc", limit=1
+        )
+        ctx.rows_read += res.rows_read
+        if res.last_date is None:
+            return None
+        return f"{when.label}({when.start}~{when.end}) 기간의 기록은 없어요. 이 자료에서 가장 최근 기록은 {res.last_date}예요."
 
     @staticmethod
     def _order(q: str, intent: str) -> Literal["score", "date_asc", "date_desc"]:

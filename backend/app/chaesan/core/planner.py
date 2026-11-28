@@ -23,6 +23,7 @@ GENERIC: Final = frozenset(
     {"올림픽공원", "한국체육산업개발", "한체산", "정보", "현황", "목록", "데이터", "자료", "정보목록", "강좌정보"}
 )
 _WORD: Final = re.compile(r"[0-9A-Za-z가-힣]+")
+VAGUE_CANDIDATES: Final = 9  # 데이터 이름을 직접 말하지 않은 질문의 후보 상한
 SIBLING_GROUP_MAX: Final = 3  # 이 수 이하로 작은 묶음만 형제 카드를 함께 후보로 넣는다(큰 묶음은 후보가 넘친다)
 
 PLAN_SCHEMA: Final[dict[str, Any]] = {
@@ -113,6 +114,15 @@ def rank_cards(question: str, catalog: Catalog, *, limit: int = MAX_CANDIDATES) 
     if not top and not planned:  # 단서가 없으면 주제 묶음의 대표 데이터를 후보로 준다(LLM이 고르게)
         fallback = True
         top = [Candidate(catalog.cards[g.representative], 0.0, False) for g in catalog.groups.values()]
+    elif not any_direct and not planned:
+        # 질문이 데이터 이름을 직접 말하지 않으면(예: '요즘 무슨 행사가 있어?') 낱말 겹침만으로는 알맞은 카드가 빠지기 쉽다.
+        # 아직 없는 주제 묶음의 대표 데이터를 채워 넣어 LLM이 고를 수 있게 한다(프롬프트 크기 보호로 VAGUE_CANDIDATES까지만).
+        have = {c.card.id for c in top}
+        for g in catalog.groups.values():
+            rep = catalog.cards.get(g.representative)
+            if rep is not None and rep.loaded and rep.id not in have and len(top) < VAGUE_CANDIDATES:
+                top.append(Candidate(rep, 0.0, False))
+                have.add(rep.id)
     return Ranking(top, planned, fallback)
 
 

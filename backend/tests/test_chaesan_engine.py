@@ -679,3 +679,47 @@ def test_parse_plan_period_ok_flag(env: SimpleNamespace) -> None:
     assert planner.parse_plan(empty_docs, cands, period_ok=True).search_terms == ()
     with pytest.raises(planner.PlanError):  # 기간이 있어도 문서 출처가 아니면 소용없다
         planner.parse_plan(plan(card_ids=["15133891"]), cands, period_ok=True)
+
+
+# ------------------------------------------------- 기획서 예시 질문을 실제 모델로 확인하며 찾은 결함의 회귀 테스트
+
+
+def test_vague_question_gets_group_representatives_as_candidates(env: SimpleNamespace) -> None:
+    """데이터 이름을 직접 말하지 않은 질문('요즘 무슨 행사가?')은 낱말 겹침만으로는 소식 카드가 후보에서 빠졌다."""
+    r = planner.rank_cards("요즘 공원에 무슨 행사가 있어?", env.catalog)
+    ids = [c.card.id for c in r.candidates]
+    assert "15090715" in ids  # 소식 묶음의 대표(핫뉴스)
+    assert len(ids) <= planner.VAGUE_CANDIDATES
+    assert not r.fallback or len(ids) == len(env.catalog.groups)
+    direct = planner.rank_cards("테니스장 이용자는?", env.catalog)
+    assert len(direct.candidates) <= 5  # 직접 가리킨 질문은 후보가 불어나지 않는다
+
+
+def test_empty_window_reports_the_latest_available_record(env: SimpleNamespace) -> None:
+    """'요즘 행사'는 마지막 소식이 2026-06-19라 최근 30일에는 없다. 그냥 '근거 없음'이 아니라 가장 최근 기록 날짜를 알려 준다."""
+    sink = ListSink()
+    llm = ScriptedLLM(plan(intent="news", card_ids=["15090715"], search_terms=["행사"]))
+    card = run(make(env, llm, sink=sink).ask("요즘 공원에 무슨 행사가 있어?"))
+    assert card.status == "unknown"
+    assert "최근 30일" in card.answer
+    assert "2026-06-19" in card.answer
+    assert card.meta["llm_calls"] == 1  # 설명은 부르지 않는다
+    assert [r["reason"] for r in sink.records] == ["no_evidence"]
+
+
+def test_empty_window_without_period_keeps_the_plain_message(env: SimpleNamespace) -> None:
+    llm = ScriptedLLM(plan(intent="news", card_ids=["15090715"], search_terms=["존재하지않는낱말xyz"]))
+    card = run(make(env, llm).ask("핫뉴스 존재하지않는낱말xyz"))
+    assert card.status == "unknown"
+    assert card.answer.startswith("한체산 개방 데이터에서")  # 기간이 없으면 기간 안내를 지어내지 않는다
+
+
+def test_explanation_prompt_does_not_leak_example_phrases_or_skip_entity_check(env: SimpleNamespace) -> None:
+    """측정에서 본 문제: 프롬프트의 예시 문구('단위는 확인되지 않았어요')를 관련 없는 답에 그대로 붙였고,
+    질문 속 이름(잔디마당)이 근거에 없는데 비슷한 항목(잔디통제시기)으로 대신 답했다."""
+    llm = ScriptedLLM(plan(card_ids=["15133891"], sql=TENNIS_SQL), {"answer": "표를 보세요", "answers_question": True})
+    run(make(env, llm).ask(TENNIS_Q))
+    prompt = llm.calls[1][1]
+    assert "단위는 확인되지 않았어요" not in prompt  # 베낄 수 있는 구체 문구를 두지 않는다
+    assert "해당이 없으면 아무것도 덧붙이지 않는다" in prompt
+    assert "어디에도 나오지 않으면 비슷해 보이는 다른 항목으로 대신 답하지 말고" in prompt
