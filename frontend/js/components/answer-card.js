@@ -6,6 +6,7 @@ import { badges } from "./badges.js";
 import { copyButton } from "./copy-button.js";
 import { documentList } from "./documents.js";
 import { evidence } from "./evidence.js";
+import { retryButton } from "./retry-button.js";
 import { sourceList } from "./sources.js";
 import { el } from "../lib/dom.js";
 import { laneClass, laneLabel } from "../lib/lane.js";
@@ -29,6 +30,7 @@ export function botMessage(message, handlers, canCopy) {
       vm.corrections.map((c) => el("p", { class: "correction", text: `✎ ${c}` })),
       vm.numberNotice ? el("p", { class: "number-notice", text: vm.numberNotice }) : null,
       answerBlock(message, handlers),
+      vm.retryable ? retryButton(() => handlers.onRetry(message.id)) : null,
       badges(vm.badges),
       evidence(message, handlers),
       documentList(vm.documents),
