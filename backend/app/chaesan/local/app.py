@@ -35,7 +35,7 @@ from app.chaesan.ingest.load import BACKEND_DIR, DB_PATH
 from app.chaesan.local.clock import SystemClock
 from app.chaesan.local.db import SqliteDB
 from app.chaesan.local.demand import JsonlDemandSink
-from app.chaesan.local.llm import OllamaLLM
+from app.chaesan.local.llm import make_llm
 from app.chaesan.local.ratelimit import RateLimitMiddleware
 
 logger = logging.getLogger(__name__)
@@ -99,7 +99,7 @@ def build_engine(
     """파일에서 엔진을 만든다. 파일이 없거나 형식이 틀리면 시작할 때 바로 멈춘다(조용히 빈 데이터로 시작하지 않는다)."""
     return Engine(
         db=SqliteDB(db_path),
-        llm=OllamaLLM(),
+        llm=make_llm(),  # LLM_PROVIDER에 따라 Ollama 또는 Workers AI
         clock=SystemClock(),
         catalog=load_catalog(cards_dir),
         vocab=load_vocab(aliases),
