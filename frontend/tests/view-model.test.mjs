@@ -178,3 +178,14 @@ test("제목 속 <br> 태그는 구분 글자로 바꾸고, 다른 태그는 글
   const vm = toViewModel({ ...base, documents: [{ date: "1990-07", title: "a<br />b", url: "", source: "s" }] });
   assert.equal(vm.documents[0].title, "a · b");
 });
+
+test("다시 시도는 잠깐의 문제에만 권한다(차단·길이·한도는 같은 질문을 다시 보내도 같다)", () => {
+  for (const kind of ["timeout", "network", "busy", "server"]) assert.equal(failureViewModel(kind).retryable, true, kind);
+  for (const kind of ["blocked", "invalid", "rate", "offline"]) assert.equal(failureViewModel(kind).retryable, false, kind);
+  assert.equal(toViewModel(base).retryable, false); // 정상 답에는 단추가 없다
+});
+
+test("한도 안내는 서버가 준 문장을 쓴다(분당 제한과 하루 한도의 안내가 다르다)", () => {
+  assert.equal(failureViewModel("rate", "오늘 받을 수 있는 질문을 모두 썼어요.").answer, "오늘 받을 수 있는 질문을 모두 썼어요.");
+  assert.ok(failureViewModel("rate").answer.includes("예시 질문")); // 서버 문장이 없으면 기본 문구
+});
